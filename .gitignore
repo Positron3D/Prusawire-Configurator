@@ -1,3 +1,45 @@
+# macOS
 .DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Editors / IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.settings/
+
+# Claude / agent state
 .claude/
+
+# Node / npm (none today, but in case tooling is added)
 node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+
+# Local server / dev caches
+.cache/
+*.log
+*.pid
+
+# Build output (none today)
+dist/
+build/
+
+# Source models — large binaries the configurator loads at runtime.
+# Tracked separately (or via LFS); not committed to this repo.
+models/*
+!models/.gitkeep
+
+# Temporary / scratch
+tmp/
+temp/
+*.tmp
+*.bak

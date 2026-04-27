@@ -1,0 +1,10 @@
+- Get final CAD tweaked in Fusion and exported --> Converted
+- Link to BOM in top of sidebar!
+- Pull in two line loading screen from CADScope.
+- Pull in version # from CADScope (lower right)
+- Move Colors elsewhere (maybe the controls pane)
+- Add Config starting points (or in other words, preselected choices):
+	- Scratch Build
+	- From MK3
+	- From MK4
+	- From Core One Upgrade Kit

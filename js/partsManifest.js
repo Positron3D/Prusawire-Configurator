@@ -411,6 +411,12 @@ export const partsManifest = {
         wwbmg: {
             category: "WW-BMG",
             description: "Wrist Watch BMG extruder model",
+            // Mesh-name routing applied to every variant — motor plate and tension
+            // arm take the user's accent color; the main body falls through to the
+            // WW-BMG category default (mainColor).
+            colorMap: {
+                accent: ["motor_plate", "tension_arm"]
+            },
             variants: {
                 // No Sensors without Crossbow
                 "wwbmg-no-sensors": {
@@ -465,6 +471,14 @@ export const partsManifest = {
         cowlings: {
             category: "Cowling",
             description: "Main toolhead body",
+            // Hex Cowling variant routing — applies only when the user toggles the
+            // multi-colour Hex Cowl option. Hexagonal inserts take the accent
+            // color, support meshes are hidden from the preview, and the cowling
+            // body falls through to the category default (mainColor).
+            colorMapHex: {
+                accent: ["hexagon"],
+                hidden: ["support"]
+            },
             variants: {
                 // Dragon/Rapido HF (and Dragon Ace, UHF-Mini, Ace Volcano)
                 "cowling-dragon-rapido-xol": {

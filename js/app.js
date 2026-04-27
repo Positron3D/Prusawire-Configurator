@@ -7,11 +7,35 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
 import { partsManifest } from './partsManifest.js';
+
+const HDRI_PATH = 'assets/bg.hdr';
+const BASE_BRIGHTNESS = 1.0;
+const DEFAULT_BRIGHTNESS_SCALE = 1.5;
+
+const loadingPhrases = [
+    'Reticulating splines',
+    'Realigning the dilithium crystals',
+    'Downloading more RAM',
+    'Getting more DDR5 from the back of a truck',
+    'Bribing the hamsters',
+    'Summoning the ancient ones',
+    'Consulting the oracle',
+    'Sharpening the voxels',
+    'Asking Jeeves',
+    'Blowing on the cartridge',
+    'Synchronizing quantum entanglement buffers',
+    'Resolving cascading temporal anomalies',
+    'Almost done (lying)',
+    'This is taking longer than expected (it isn’t)',
+    'Please enjoy this interstitial moment'
+];
 
 // Set up DRACO loader for compressed GLTF files
 const dracoLoader = new DRACOLoader();
-dracoLoader.setDecoderPath('https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/libs/draco/');
+dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
+dracoLoader.setDecoderConfig({ type: 'js' });
 
 // ============================================
 // Application State
@@ -290,85 +314,162 @@ function darkenColor(color, amount) {
     return (r << 16) | (g << 8) | b;
 }
 
+/**
+ * Normalize a Three.js node name for matching against manifest mesh-name lists.
+ * Mirrors the cleanup the CADScope STEP→GLB pipeline applies during Blender export
+ * (strip path, strip .step, strip (mesh)/(group), spaces→underscores, drop [].:/).
+ */
+function cleanNodeName(name) {
+    if (!name) return '';
+    let cleaned = name.includes('/') ? name.substring(name.lastIndexOf('/') + 1) : name;
+    cleaned = cleaned.replace(/\.step/i, '');
+    cleaned = cleaned.replace(/\s*\(mesh\)\s*/i, '').replace(/\s*\(group\)\s*/i, '');
+    cleaned = cleaned.replace(/ /g, '_').replace(/[\[\].:\/]/g, '');
+    return cleaned.trim();
+}
+
+/**
+ * Strip a "-N" numeric suffix that Blender/Three.js append to deduplicate
+ * repeated node names. Used as the second tier of mesh-name matching.
+ */
+function stripNumericSuffix(name) {
+    return name.replace(/-\d+$/, '');
+}
+
+/**
+ * Resolve which colorMap to use for a part — variant overrides category default.
+ * Falls back to the hex variant when the user has the Hex Cowl option enabled
+ * (cowlings) or whenever isHexCowl is set on the part. Returns null when no
+ * routing is defined and the category default color should apply to all meshes.
+ */
+function resolveColorMap(part, isHexCowl) {
+    const category = partsManifest.parts[part.category];
+    const variantMap = isHexCowl ? part.colorMapHex : part.colorMap;
+    const categoryMap = isHexCowl ? category?.colorMapHex : category?.colorMap;
+    return variantMap || categoryMap || null;
+}
+
+/**
+ * Resolve the default {color, opacity} for a part based on its category.
+ * Per-mesh overrides from a colorMap are layered on top of this default.
+ */
+function getCategoryDefault(part) {
+    if (part.id === 'crossbow-assembly') {
+        return { color: 0x888888, opacity: 0.6 };
+    }
+    switch (part.category) {
+        case 'cowlings':         return { color: state.mainColor, opacity: 1.0 };
+        case 'hotendDucts':      return { color: darkenColor(state.mainColor, 0.2), opacity: 1.0 };
+        case 'extruderAdapters':
+        case 'boardMounts':      return { color: state.accentColor, opacity: 1.0 };
+        case 'wwbmg':            return { color: state.mainColor, opacity: 1.0 };
+        case 'carriages':
+        case 'hotends':
+        case 'extruders':        return { color: 0x888888, opacity: 0.6 };
+        case 'hotendSpacers':    return { color: 0xd94a4a, opacity: 1.0 };
+        case 'ledHolders':       return { color: 0xeeeeee, opacity: 1.0 };
+        default:                 return { color: 0x888888, opacity: 1.0 };
+    }
+}
+
 // ============================================
 // Three.js Setup
 // ============================================
-let scene, camera, renderer, controls;
+let scene, camera, renderer, controls, pmrem;
 let modelGroup;  // Group to hold all part models
+let baseLightIntensities = [];  // Populated by setupLighting; consumed by brightness slider
 
 function initThreeJS() {
     const container = document.getElementById('viewer-3d');
     const width = container.clientWidth;
     const height = container.clientHeight;
-    
+
     // Scene
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0x0a0c10);
-    
+
     // Camera - set up for mm scale (parts are ~100mm)
     camera = new THREE.PerspectiveCamera(25, width / height, 1, 10000);
     camera.position.set(143.84, 82.10, 285.96);
-    
+
     // Renderer
     renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(width, height);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.shadowMap.enabled = false;
-    // renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 0.5;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     container.appendChild(renderer.domElement);
-    
+
     // Controls
     controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
     controls.target.set(0.91, 25.89, -35.32);
     controls.update();
-    
+
     // Lighting
     setupLighting();
-    
+
+    // HDRI environment for image-based reflections
+    pmrem = new THREE.PMREMGenerator(renderer);
+    new RGBELoader().load(
+        HDRI_PATH,
+        (texture) => {
+            const envMap = pmrem.fromEquirectangular(texture).texture;
+            scene.environment = envMap;
+            texture.dispose();
+        },
+        undefined,
+        (err) => console.warn('HDRI load failed:', err)
+    );
+
     // Model group
     modelGroup = new THREE.Group();
     scene.add(modelGroup);
-    
+
     // Expose for dev tools
     window.modelGroup = modelGroup;
     window.scene = scene;
     window.camera = camera;
     window.controls = controls;
-    
+
     // Handle resize
     window.addEventListener('resize', onWindowResize);
-    
+
     // Start render loop
     animate();
-    
+
     // Loading overlay is hidden after models finish loading in updateConfiguration()
 }
 
 function setupLighting() {
-    // Ambient light
-    const ambient = new THREE.AmbientLight(0xffffff, 0.5);
+    // Ambient base — keeps shadowed faces from going pure black under HDRI
+    const ambient = new THREE.AmbientLight(0xffffff, 0.3);
     scene.add(ambient);
-    
-    // Key light
-    const keyLight = new THREE.DirectionalLight(0xffffff, 1);
-    keyLight.position.set(50, 100, 50);
-    keyLight.castShadow = false;
-    // keyLight.shadow.mapSize.width = 2048;
-    // keyLight.shadow.mapSize.height = 2048;
-    scene.add(keyLight);
-    
-    // Fill light
-    const fillLight = new THREE.DirectionalLight(0xffffff, 0.3);
-    fillLight.position.set(-50, 50, -50);
-    scene.add(fillLight);
-    
-    // Rim light
-    const rimLight = new THREE.DirectionalLight(0xe94560, 0.2);
-    rimLight.position.set(0, -50, -100);
-    scene.add(rimLight);
+
+    // Hemisphere — sky/ground bias for natural shading
+    const hemi = new THREE.HemisphereLight(0xffffff, 0x222222, BASE_BRIGHTNESS * DEFAULT_BRIGHTNESS_SCALE);
+    scene.add(hemi);
+
+    // Key directional
+    const dir = new THREE.DirectionalLight(0xffffff, BASE_BRIGHTNESS * DEFAULT_BRIGHTNESS_SCALE);
+    dir.position.set(50, 100, 70);
+    scene.add(dir);
+
+    // Fill directional from opposite side
+    const dirFill = new THREE.DirectionalLight(0xffffff, BASE_BRIGHTNESS * DEFAULT_BRIGHTNESS_SCALE * 0.6);
+    dirFill.position.set(-50, -100, -70);
+    scene.add(dirFill);
+
+    // Brightness slider scales these against their base intensities
+    baseLightIntensities = [
+        { light: hemi, base: BASE_BRIGHTNESS },
+        { light: dir, base: BASE_BRIGHTNESS },
+        { light: dirFill, base: BASE_BRIGHTNESS * 0.6 }
+    ];
 }
 
 function onWindowResize() {
@@ -394,6 +495,27 @@ function animate() {
 // ============================================
 const gltfLoader = new GLTFLoader();
 gltfLoader.setDRACOLoader(dracoLoader);
+
+/**
+ * Dispose of geometry, materials, and any textures attached to a model subtree.
+ * Call when removing a model from the scene to free GPU resources.
+ * Cached models in state.loadedModels stay alive — only call on instances
+ * that have been deep-cloned out of the cache.
+ */
+function disposeObject(obj) {
+    obj.traverse((child) => {
+        if (!child.isMesh) return;
+        child.geometry?.dispose();
+        const materials = Array.isArray(child.material) ? child.material : [child.material];
+        for (const mat of materials) {
+            if (!mat) continue;
+            for (const value of Object.values(mat)) {
+                if (value && value.isTexture) value.dispose();
+            }
+            mat.dispose();
+        }
+    });
+}
 
 /**
  * Deep clone a Three.js object, including materials and geometries
@@ -481,65 +603,55 @@ function applyTransform(model, transform) {
     model.scale.set(finalScale, finalScale, finalScale);
 }
 
-function applyMaterial(model, color, opacity = 1.0, partId = null, isHexCowl = false) {
+/**
+ * Apply per-mesh materials to a model. Mesh names are routed via the
+ * provided colorMap ({ accent, main, hidden } — each an array of mesh names
+ * to match using the three-tier rule: clean name, numeric-suffix-stripped,
+ * parent name). Unmatched meshes inherit the part's category default.
+ */
+function applyMaterial(model, defaultColor, defaultOpacity, colorMap) {
+    // Lowercase the manifest entries so matching against mixed-case mesh names
+    // is forgiving — preserves the original toLowerCase().includes() behavior
+    // for GLBs that pre-date the CADScope STEP→GLB pipeline normalization.
+    const lc = (arr) => new Set((arr || []).map(s => s.toLowerCase()));
+    const accentSet = lc(colorMap?.accent);
+    const mainSet = lc(colorMap?.main);
+    const hiddenSet = lc(colorMap?.hidden);
+
     model.traverse((child) => {
-        if (child.isMesh) {
-            // Build full hierarchy string for matching
-            let allNames = child.name.toLowerCase();
-            let p = child.parent;
-            while (p) {
-                if (p.name) allNames += ' ' + p.name.toLowerCase();
-                p = p.parent;
-            }
-            
-            // For hex cowlings: hide support meshes entirely
-            if (isHexCowl) {
-                if (allNames.includes('support')) {
-                    child.visible = false;
-                    return;  // Skip material assignment for hidden meshes
-                }
-            }
-            
-            let meshColor = color;
-            let meshOpacity = opacity;
-            
-            // Apply different colors to hex cowling sub-parts
-            if (isHexCowl) {
-                if (allNames.includes('hexagon')) {
-                    meshColor = state.accentColor;
-                    meshOpacity = 1.0;
-                } else {
-                    // Main cowling body - main color
-                    meshColor = state.mainColor;
-                    meshOpacity = 1.0;
-                }
-            }
-            // Apply different colors to WW-BMG sub-parts using custom colors
-            else if (partId && partId.startsWith('wwbmg')) {
-                const wwbmgPartColors = {
-                    'motor_plate': state.accentColor,  // Includes sensor variants
-                    'tension_arm': state.accentColor,  // Includes idler variants
-                    'main_body': state.mainColor
-                };
-                for (const [partName, partColor] of Object.entries(wwbmgPartColors)) {
-                    if (allNames.includes(partName)) {
-                        meshColor = partColor;
-                        meshOpacity = 1.0;
-                        break;
-                    }
-                }
-            }
-            
-            child.material = new THREE.MeshStandardMaterial({
-                color: meshColor,
-                metalness: 0.1,
-                roughness: 0.7,
-                transparent: meshOpacity < 1.0,
-                opacity: meshOpacity
-            });
-            child.castShadow = false;
-            child.receiveShadow = false;
+        if (!child.isMesh) return;
+
+        const cleaned = cleanNodeName(child.name).toLowerCase();
+        const stripped = stripNumericSuffix(cleaned);
+        const parentCleaned = child.parent ? cleanNodeName(child.parent.name).toLowerCase() : '';
+        const matchesIn = (set) => set.size > 0 && (set.has(cleaned) || set.has(stripped) || set.has(parentCleaned));
+
+        if (matchesIn(hiddenSet)) {
+            child.visible = false;
+            return;
         }
+
+        let meshColor = defaultColor;
+        let meshOpacity = defaultOpacity;
+
+        if (matchesIn(accentSet)) {
+            meshColor = state.accentColor;
+            meshOpacity = 1.0;
+        } else if (matchesIn(mainSet)) {
+            meshColor = state.mainColor;
+            meshOpacity = 1.0;
+        }
+
+        child.visible = true;
+        child.material = new THREE.MeshStandardMaterial({
+            color: meshColor,
+            metalness: 0.1,
+            roughness: 0.7,
+            transparent: meshOpacity < 1.0,
+            opacity: meshOpacity
+        });
+        child.castShadow = false;
+        child.receiveShadow = false;
     });
 }
 
@@ -547,43 +659,12 @@ function applyMaterial(model, color, opacity = 1.0, partId = null, isHexCowl = f
  * Re-apply materials to all active models (used when colors change)
  */
 function updateModelColors() {
-    state.activeModels.forEach((model, partId) => {
+    state.activeModels.forEach((model) => {
         const part = model.userData;
         if (!part) return;
-        
-        // Determine base color and opacity for this part
-        let color, opacity = 1.0;
-        
-        // Crossbow assembly - matches carriage (check first, before category)
-        if (partId === 'crossbow-assembly') {
-            color = 0x888888;
-            opacity = 0.6;
-        // Cowlings use main color
-        } else if (part.category === 'cowlings') {
-            color = state.mainColor;
-        // Hotend ducts are slightly darker for contrast
-        } else if (part.category === 'hotendDucts') {
-            color = darkenColor(state.mainColor, 0.2);
-        // Parts that use accent color
-        } else if (part.category === 'extruderAdapters' || part.category === 'boardMounts') {
-            color = state.accentColor;
-        // WW-BMG has sub-parts handled in applyMaterial
-        } else if (part.category === 'wwbmg') {
-            color = state.mainColor;  // Default, sub-parts override
-        // Other categories keep their fixed colors
-        } else if (part.category === 'carriages' || part.category === 'hotends' || part.category === 'extruders') {
-            color = 0x888888;
-            opacity = 0.6;
-        } else if (part.category === 'hotendSpacers') {
-            color = 0xd94a4a;
-        } else if (part.category === 'ledHolders') {
-            color = 0xeeeeee;
-        } else {
-            color = 0x888888;
-        }
-        
-        // Pass isHexCowl flag for proper sub-part coloring
-        applyMaterial(model, color, opacity, partId, part.isHexCowl || false);
+        const { color, opacity } = getCategoryDefault(part);
+        const colorMap = resolveColorMap(part, part.isHexCowl || false);
+        applyMaterial(model, color, opacity, colorMap);
     });
 }
 
@@ -873,6 +954,11 @@ async function updateViewer() {
     });
     
     if (needsLoading) {
+        const loadingText = document.getElementById('loading-text');
+        if (loadingText) {
+            const phrase = loadingPhrases[Math.floor(Math.random() * loadingPhrases.length)];
+            loadingText.textContent = phrase + '...';
+        }
         document.getElementById('loading').classList.remove('hidden');
     }
     
@@ -881,6 +967,7 @@ async function updateViewer() {
         const model = state.activeModels.get(partId);
         if (model) {
             modelGroup.remove(model);
+            disposeObject(model);
             state.activeModels.delete(partId);
         }
     }
@@ -904,40 +991,11 @@ async function updateViewer() {
             }
             
             applyTransform(model, part.transform);
-            
-            // Apply material color - use custom colors for main/accent parts
-            let color, opacity = 1.0;
-            
-            // Crossbow assembly - matches carriage (check first, before category)
-            if (part.id === 'crossbow-assembly') {
-                color = 0x888888;
-                opacity = 0.6;
-            // Cowlings use main color (customizable)
-            } else if (part.category === 'cowlings') {
-                color = state.mainColor;
-            // Hotend ducts are slightly darker for contrast
-            } else if (part.category === 'hotendDucts') {
-                color = darkenColor(state.mainColor, 0.2);
-            // Parts that use accent color (customizable)
-            } else if (part.category === 'extruderAdapters' || part.category === 'boardMounts') {
-                color = state.accentColor;
-            // WW-BMG uses main color as base, sub-parts handled in applyMaterial
-            } else if (part.category === 'wwbmg') {
-                color = state.mainColor;
-            // Fixed colors for other categories
-            } else if (part.category === 'carriages' || part.category === 'hotends' || part.category === 'extruders') {
-                color = 0x888888;
-                opacity = 0.6;
-            } else if (part.category === 'hotendSpacers') {
-                color = 0xd94a4a;
-            } else if (part.category === 'ledHolders') {
-                color = 0xeeeeee;
-            } else {
-                color = 0x888888;
-            }
-            
-            applyMaterial(model, color, opacity, part.id, isHexCowl);
-            
+
+            const { color, opacity } = getCategoryDefault(part);
+            const colorMap = resolveColorMap(part, isHexCowl);
+            applyMaterial(model, color, opacity, colorMap);
+
             // Add to scene
             model.name = part.id;
             model.userData = { ...part, isHexCowl };  // Store hex cowl state for color updates
@@ -984,6 +1042,63 @@ function centerCameraOnModels() {
     controls.update();
 }
 
+/**
+ * Frame the model group from one of the six axis-aligned directions, or
+ * return to the predefined home view. Distance is derived from the current
+ * scene bounding box so the framing fits whatever assembly is loaded.
+ */
+function setView(view) {
+    if (view === 'home') {
+        centerCameraOnModels();
+        return;
+    }
+
+    const box = new THREE.Box3().setFromObject(modelGroup);
+    if (box.isEmpty()) return;
+    const center = box.getCenter(new THREE.Vector3());
+    const distance = box.getSize(new THREE.Vector3()).length() * 1.5;
+
+    const offset = new THREE.Vector3();
+    switch (view) {
+        case 'top':    offset.set(0, distance, 0); break;
+        case 'bottom': offset.set(0, -distance, 0); break;
+        case 'front':  offset.set(0, 0, distance); break;
+        case 'back':   offset.set(0, 0, -distance); break;
+        case 'left':   offset.set(-distance, 0, 0); break;
+        case 'right':  offset.set(distance, 0, 0); break;
+        default: return;
+    }
+
+    controls.target.copy(center);
+    camera.position.copy(center).add(offset);
+    camera.up.set(0, 1, 0);
+    camera.lookAt(center);
+    controls.update();
+}
+
+/**
+ * Multiplicative zoom relative to the current camera-target distance.
+ * Positive factor zooms out, negative zooms in (matches CADScope buttons).
+ * Clamped to [0.1×, 10×] of the model's bounding-box diagonal.
+ */
+function zoom(factor) {
+    const dirVec = new THREE.Vector3().subVectors(camera.position, controls.target).normalize();
+    const distance = camera.position.distanceTo(controls.target);
+
+    const box = new THREE.Box3().setFromObject(modelGroup);
+    const modelSize = box.isEmpty() ? 100 : box.getSize(new THREE.Vector3()).length();
+    const minDist = modelSize * 0.1;
+    const maxDist = modelSize * 10;
+    const clamped = Math.max(minDist, Math.min(maxDist, distance * (1 + factor)));
+
+    camera.position.copy(controls.target).addScaledVector(dirVec, clamped);
+    controls.update();
+}
+
+function resetZoom() {
+    centerCameraOnModels();
+}
+
 // ============================================
 // Event Handlers
 // ============================================
@@ -1024,11 +1139,25 @@ function setupEventListeners() {
         });
     });
 
-    // Viewer controls
-    document.getElementById('btn-reset-view').addEventListener('click', () => {
-        centerCameraOnModels();
+    // Viewer controls — view cube uses event delegation on data-view attribute
+    document.querySelectorAll('.viewer-controls [data-view]').forEach(btn => {
+        btn.addEventListener('click', () => setView(btn.dataset.view));
     });
+    document.getElementById('btn-zoom-out').addEventListener('click', () => zoom(0.2));
+    document.getElementById('btn-zoom-in').addEventListener('click', () => zoom(-0.2));
+    document.getElementById('btn-zoom-reset').addEventListener('click', resetZoom);
     document.getElementById('btn-wireframe').addEventListener('click', toggleWireframe);
+
+    // Brightness slider scales hemi + directional lights against their base intensities
+    const brightnessSlider = document.getElementById('brightness-slider');
+    if (brightnessSlider) {
+        brightnessSlider.addEventListener('input', (e) => {
+            const scale = e.target.value / 100;
+            for (const { light, base } of baseLightIntensities) {
+                light.intensity = base * scale;
+            }
+        });
+    }
 
     // Color pickers
     document.getElementById('main-color').addEventListener('input', (e) => {
