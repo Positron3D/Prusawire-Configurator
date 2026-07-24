@@ -813,7 +813,7 @@ body {
     transition: width 0.15s ease-out;
 }
 
-.mobile-warning {
+.viewer-notice {
     position: absolute;
     top: 50%;
     left: 50%;
@@ -831,6 +831,19 @@ body {
     font-size: 0.875rem;
 }
 
-.mobile-warning.hidden {
+.viewer-notice.hidden {
     display: none;
+}
+
+.preview-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+
+.preview-toggle input {
+    accent-color: var(--accent);
 }

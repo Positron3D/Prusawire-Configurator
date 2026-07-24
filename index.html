@@ -22,6 +22,7 @@
                 <span class="subtitle">by Positron 3D</span>
             </div>
             <div class="header-links">
+                <label class="preview-toggle"><input type="checkbox" id="preview-toggle"><span>3D Preview</span></label>
                 <a href="https://cad.positron3d.com/?model=Prusawire_2026.R1" target="_blank" class="cadscope-link">Open in CADScope</a>
                 <a href="https://github.com/Positron3D/Prusawire" target="_blank">GitHub</a>
                 <a href="https://discord.gg/positron" target="_blank">Discord</a>
@@ -113,16 +114,16 @@
                     <input type="range" id="brightness-slider" min="0" max="200" value="150" title="Brightness">
                 </div>
 
-                <!-- Mobile warning: shown instead of auto-loading the model -->
-                <div class="mobile-warning hidden" id="mobile-warning">
-                    <p><strong>Best viewed on a desktop browser.</strong></p>
-                    <p>The 3D preview downloads an ~80&nbsp;MB model, which can
-                       crash mobile browsers or eat into a data plan.</p>
-                    <button class="btn-download" id="mobile-load-btn">Load the 3D model anyway</button>
+                <!-- The 3D preview is opt-in; this card fronts the empty viewer -->
+                <div class="viewer-notice" id="preview-off-card">
+                    <p><strong>3D preview is off.</strong></p>
+                    <p>Loading the model downloads ~80&nbsp;MB &mdash; heavy for
+                       mobile browsers and metered connections.</p>
+                    <button class="btn-download" id="preview-load-btn">Load 3D preview</button>
                 </div>
 
                 <!-- Loading Indicator -->
-                <div class="loading-indicator" id="loading">
+                <div class="loading-indicator hidden" id="loading">
                     <div class="loading-line">
                         <div class="spinner-small"></div>
                         <span id="loading-text">Loading...</span>

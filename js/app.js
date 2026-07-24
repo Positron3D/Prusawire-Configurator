@@ -56,6 +56,7 @@ const state = {
     partNodes: new Map(),  // manifest part id -> scene nodes
     sceneRoot: null,       // composite model root (glTF Scene wrapper skipped)
     config: {},            // current option choices, keyed by option id
+    preview3d: false,      // 3D model loads only when the preview is enabled
     colorsPicked: false,   // colors persist/share only once the user picks one
     mainColor: 0x797979,   // overwritten from the palette at load
     accentColor: 0x9F6204
@@ -848,36 +849,46 @@ function setupScrollIndicator() {
     setTimeout(updateScrollIndicator, RENDER_DELAY_MS);
 }
 
-/**
- * Mobile-ish detection by capability: coarse pointer plus a small screen.
- * Used to gate the heavy model download behind an explicit tap.
- */
-function isProbablyMobile() {
-    const coarse = window.matchMedia('(pointer: coarse)').matches;
-    const shortEdge = Math.min(window.screen.width, window.screen.height);
-    return coarse && shortEdge < 820;
+// The 3D preview is opt-in: the composite model downloads only after the
+// user enables the preview. The choice persists for the tab session.
+let modelLoadStarted = false;
+
+async function loadModelFlow() {
+    modelLoadStarted = true;
+    document.getElementById('loading').classList.remove('hidden');
+    try {
+        await loadCompositeModel();
+    } catch (error) {
+        console.error('Model load failed:', error);
+        return;
+    }
+    applyColors();
+    updateConfiguration();
+    modelGroup.visible = state.preview3d;
+    requestRender();
+    document.getElementById('loading').classList.add('hidden');
 }
 
-/**
- * On mobile, show a best-on-desktop warning and resolve only when the user
- * explicitly asks to load the model. Desktop resolves immediately.
- */
-function confirmMobileLoad() {
-    const warning = document.getElementById('mobile-warning');
-    if (!warning || !isProbablyMobile()) {
-        return Promise.resolve();
+function setPreview(on) {
+    state.preview3d = on;
+    try {
+        if (on) {
+            sessionStorage.setItem('prusawire-preview', '1');
+        } else {
+            sessionStorage.removeItem('prusawire-preview');
+        }
+    } catch (e) { /* private browsing */ }
+
+    document.getElementById('preview-toggle').checked = on;
+    document.getElementById('preview-off-card').classList.toggle('hidden', on);
+    document.querySelector('.viewer-controls').style.display = on ? '' : 'none';
+
+    if (on && !modelLoadStarted) {
+        loadModelFlow();
+    } else if (state.sceneRoot) {
+        modelGroup.visible = on;
+        requestRender();
     }
-    const controls = document.querySelector('.viewer-controls');
-    document.getElementById('loading').classList.add('hidden');
-    controls.style.display = 'none';
-    warning.classList.remove('hidden');
-    return new Promise((resolve) => {
-        document.getElementById('mobile-load-btn').addEventListener('click', () => {
-            warning.classList.add('hidden');
-            controls.style.display = '';
-            resolve();
-        }, { once: true });
-    });
 }
 
 /**
@@ -999,17 +1010,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupEventListeners();
     syncUIToState();
 
-    await confirmMobileLoad();
-    document.getElementById('loading').classList.remove('hidden');
-    try {
-        await loadCompositeModel();
-    } catch (error) {
-        console.error('Model load failed:', error);
-        return;
-    }
-    applyColors();
-    updateConfiguration();
-    document.getElementById('loading').classList.add('hidden');
+    const previewToggle = document.getElementById('preview-toggle');
+    previewToggle.addEventListener('change', () => setPreview(previewToggle.checked));
+    document.getElementById('preview-load-btn').addEventListener('click', () => setPreview(true));
+    setPreview(sessionStorage.getItem('prusawire-preview') === '1');
 
     saveStateToSession();
 
