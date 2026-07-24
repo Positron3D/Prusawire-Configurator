@@ -67,3 +67,32 @@ export function downloadFileList(downloads, config) {
     }
     return files;
 }
+
+// The choices of a selection option that are offered under a config: a
+// choice with a when-clause is available only while the clause matches.
+export function availableChoices(optionBody, config) {
+    return (optionBody.choices || []).filter(
+        (c) => !c.when || matchesClause(c.when, config));
+}
+
+// Repair a config whose selections point at unavailable choices: each such
+// option falls back to its flagged default when available, else the first
+// available choice. Iterates until stable so cascaded constraints settle.
+export function reconcileConfig(configOptions, config) {
+    const fixed = { ...config };
+    for (let pass = 0; pass < 10; pass++) {
+        let changed = false;
+        for (const [optId, body] of Object.entries(configOptions || {})) {
+            if (body.type === 'bool' || !body.choices) continue;
+            const avail = availableChoices(body, fixed);
+            if (avail.length === 0) continue;
+            if (!avail.some((c) => c.id === fixed[optId])) {
+                const pick = avail.find((c) => c.default) || avail[0];
+                fixed[optId] = pick.id;
+                changed = true;
+            }
+        }
+        if (!changed) break;
+    }
+    return fixed;
+}

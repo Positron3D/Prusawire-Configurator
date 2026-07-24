@@ -1,6 +1,8 @@
 // ABOUTME: Renders the manifest's configOptions into the config panel and
 // ABOUTME: reports user selections back through a change callback.
 
+import { availableChoices } from './manifest_rules.js';
+
 /**
  * Render option widgets from a manifest configOptions map into `container`.
  * Selection options render as radio lists (`type: "radio"`, the default) or
@@ -9,7 +11,9 @@
  * degrade gracefully. Option-level `description` renders as a section note;
  * choice-level `description` becomes the label's tooltip.
  *
- * Returns { setValues(config) } for syncing the widgets to a config map.
+ * Returns { setValues(config), refresh(config) }: setValues syncs the
+ * widgets to a config map; refresh hides choices whose `when:` clause does
+ * not match the config (conditional choices).
  * onChange(optionId, value) fires for every user edit.
  */
 export function renderOptions(configOptions, container, onChange) {
@@ -44,7 +48,7 @@ export function renderOptions(configOptions, container, onChange) {
             label.appendChild(document.createTextNode(` ${body.label || optId}`));
             group.appendChild(label);
             section.appendChild(group);
-            inputsByOption.set(optId, { kind: 'bool', input });
+            inputsByOption.set(optId, { kind: 'bool', body, input });
         } else if (body.type === 'dropdown') {
             const select = document.createElement('select');
             for (const choice of body.choices || []) {
@@ -56,14 +60,14 @@ export function renderOptions(configOptions, container, onChange) {
             }
             select.addEventListener('change', () => onChange(optId, select.value));
             section.appendChild(select);
-            inputsByOption.set(optId, { kind: 'select', input: select });
+            inputsByOption.set(optId, { kind: 'select', body, input: select });
         } else {
             if (body.type && body.type !== 'radio') {
                 console.warn(`Unknown option type "${body.type}" for "${optId}" — rendering as radio.`);
             }
             const group = document.createElement('div');
             group.className = 'option-group';
-            const radios = [];
+            const entries = [];
             for (const choice of body.choices || []) {
                 const label = document.createElement('label');
                 label.className = 'option';
@@ -78,10 +82,10 @@ export function renderOptions(configOptions, container, onChange) {
                 label.appendChild(input);
                 label.appendChild(document.createTextNode(` ${choice.label || choice.id}`));
                 group.appendChild(label);
-                radios.push(input);
+                entries.push({ input, label });
             }
             section.appendChild(group);
-            inputsByOption.set(optId, { kind: 'radio', radios });
+            inputsByOption.set(optId, { kind: 'radio', body, entries });
         }
 
         container.appendChild(section);
@@ -96,8 +100,26 @@ export function renderOptions(configOptions, container, onChange) {
                 } else if (widget.kind === 'select') {
                     if (value != null) widget.input.value = value;
                 } else {
-                    for (const radio of widget.radios) {
-                        radio.checked = radio.value === value;
+                    for (const entry of widget.entries) {
+                        entry.input.checked = entry.input.value === value;
+                    }
+                }
+            }
+        },
+        refresh(config) {
+            for (const widget of inputsByOption.values()) {
+                if (widget.kind === 'bool') continue;
+                const avail = new Set(
+                    availableChoices(widget.body, config).map((c) => c.id));
+                if (widget.kind === 'select') {
+                    for (const opt of widget.input.options) {
+                        const ok = avail.has(opt.value);
+                        opt.hidden = !ok;
+                        opt.disabled = !ok;
+                    }
+                } else {
+                    for (const entry of widget.entries) {
+                        entry.label.style.display = avail.has(entry.input.value) ? '' : 'none';
                     }
                 }
             }

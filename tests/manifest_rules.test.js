@@ -10,6 +10,8 @@ import {
   evaluateVisible,
   validConfigKeys,
   downloadFileList,
+  availableChoices,
+  reconcileConfig,
 } from '../js/manifest_rules.js';
 
 const OPTIONS = {
@@ -126,4 +128,45 @@ test('downloadFileList dedupes across always and groups', () => {
 test('downloadFileList handles missing sections', () => {
   assert.deepEqual(downloadFileList(undefined, {}), []);
   assert.deepEqual(downloadFileList({ base: 'x' }, {}), []);
+});
+
+const GATED = {
+  z_rod: {
+    choices: [
+      { id: '10x325', default: true },
+      { id: '8x320' },
+    ],
+  },
+  bearing: {
+    choices: [
+      { id: 'lm10luu', default: true, when: { z_rod: ['10x325'] } },
+      { id: 'lm8uu', when: { z_rod: ['8x320'] } },
+      { id: 'lm8luu', when: { z_rod: ['8x320'] } },
+    ],
+  },
+};
+
+test('availableChoices filters by when clauses', () => {
+  const ids = availableChoices(GATED.bearing, { z_rod: '8x320' }).map((c) => c.id);
+  assert.deepEqual(ids, ['lm8uu', 'lm8luu']);
+});
+
+test('availableChoices keeps clause-less choices', () => {
+  const ids = availableChoices(GATED.z_rod, {}).map((c) => c.id);
+  assert.deepEqual(ids, ['10x325', '8x320']);
+});
+
+test('reconcileConfig resets an invalidated selection to first available', () => {
+  const fixed = reconcileConfig(GATED, { z_rod: '8x320', bearing: 'lm10luu' });
+  assert.equal(fixed.bearing, 'lm8uu');
+});
+
+test('reconcileConfig prefers the flagged default when it is available', () => {
+  const fixed = reconcileConfig(GATED, { z_rod: '10x325', bearing: 'lm8uu' });
+  assert.equal(fixed.bearing, 'lm10luu');
+});
+
+test('reconcileConfig leaves a valid config untouched', () => {
+  const cfg = { z_rod: '8x320', bearing: 'lm8luu' };
+  assert.deepEqual(reconcileConfig(GATED, cfg), cfg);
 });

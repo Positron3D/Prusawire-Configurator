@@ -8,7 +8,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
-import { defaultConfig as buildDefaultConfig, matchesClause, evaluateVisible, validConfigKeys, downloadFileList } from './manifest_rules.js';
+import { defaultConfig as buildDefaultConfig, matchesClause, evaluateVisible, validConfigKeys, downloadFileList, reconcileConfig } from './manifest_rules.js';
 import { buildSidecarLookups, extendPath, categoryFor } from './sidecar_colors.js';
 import { renderOptions } from './options_ui.js';
 
@@ -234,6 +234,7 @@ function resetToDefaults() {
  */
 function syncUIToState() {
     if (state.optionsUI) {
+        state.optionsUI.refresh(state.config);
         state.optionsUI.setValues(state.config);
     }
 
@@ -942,6 +943,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('option-sections'),
         (optionId, value) => {
             state.config[optionId] = value;
+            state.config = reconcileConfig(manifest.configOptions, state.config);
+            state.optionsUI.refresh(state.config);
+            state.optionsUI.setValues(state.config);
             updateConfiguration();
             saveStateToSession();
         }
@@ -952,6 +956,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!hasLoadedFromHash) {
         loadStateFromSession();
     }
+    state.config = reconcileConfig(manifest.configOptions, state.config);
     if (window.location.hash) {
         window.history.replaceState(null, '', window.location.pathname);
     }
@@ -977,6 +982,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const loaded = loadStateFromHash();
         if (loaded) {
             window.history.replaceState(null, '', window.location.pathname);
+            state.config = reconcileConfig(state.manifest.configOptions, state.config);
             syncUIToState();
             applyColors();
             updateConfiguration();
