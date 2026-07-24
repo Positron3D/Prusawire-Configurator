@@ -433,10 +433,17 @@ function tickCameraAnimation() {
     return true;
 }
 
+// Distance at which the model's bounding sphere fills the camera's FOV,
+// with a padding margin. FOV-aware so camera tuning cannot break framing.
+function fitDistance(margin = 1.2) {
+    const fovRad = camera.fov * Math.PI / 180;
+    return ((modelSize / 2) * margin) / Math.tan(fovRad / 2);
+}
+
 // Build a target pose looking at modelCenter from a given direction at the
 // canonical model-fit distance. Used by all axis-view buttons.
 function poseFromDirection(direction, up) {
-    const distance = modelSize * 1.5;
+    const distance = fitDistance();
     const eye = modelCenter.clone().addScaledVector(direction.clone().normalize(), distance);
     const m = new THREE.Matrix4().lookAt(eye, modelCenter, up);
     return {
@@ -482,7 +489,7 @@ function loadCompositeModel() {
                 camera.near = modelSize * 0.001;
                 camera.far = modelSize * 100;
                 const dir = new THREE.Vector3(0.4, 0.25, 0.88).normalize();
-                camera.position.copy(modelCenter).addScaledVector(dir, modelSize * 1.2);
+                camera.position.copy(modelCenter).addScaledVector(dir, fitDistance());
                 controls.target.copy(modelCenter);
                 camera.up.set(0, 1, 0);
                 camera.lookAt(modelCenter);

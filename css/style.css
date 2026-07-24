@@ -98,7 +98,7 @@ body {
 
 /* Config Panel */
 .config-panel {
-    width: 450px;
+    width: 640px;
     min-width: 280px;
     background: var(--bg-panel);
     border-right: 1px solid var(--border-color);
@@ -114,6 +114,14 @@ body {
     padding: 1rem;
     /* Force scrollbar visibility on mobile */
     -webkit-overflow-scrolling: touch;
+}
+
+/* Option widgets flow in two columns inside the wider panel. */
+#option-sections {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 1.25rem;
+    align-items: start;
 }
 
 /* Custom scrollbar for webkit browsers (Chrome, Safari, Edge) */
@@ -719,6 +727,10 @@ body {
         max-height: 45vh;
         border-right: none;
         border-bottom: 1px solid var(--border-color);
+    }
+
+    #option-sections {
+        grid-template-columns: 1fr;
     }
     
     .scroll-indicator {
