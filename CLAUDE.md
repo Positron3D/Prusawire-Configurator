@@ -1,46 +1,37 @@
 # Prusawire Configurator
 
-Static browser-based 3D configurator for Prusawire 2026.R1 toolhead parts, derived from the A4T Toolhead Configurator. Users pick options, see a Three.js preview, and download matching STL / 3MF files as a ZIP.
+Static browser-based 3D configurator for the Prusawire 2026.R1 printer, derived from the A4T Toolhead Configurator. Users pick build options, see a Three.js preview of one composite model with variant subtrees toggled by visibility rules, and can share their configuration by URL.
 
 ## Stack & layout
 
-Plain HTML / CSS / ES-module JS. No build step, no `package.json`, no tests.
+Plain HTML / CSS / ES-module JS. No build step, no `package.json`. Unit tests run on Node's built-in runner.
 
-- `index.html` — single-page UI: config sidebar + 3D viewer.
-- `js/app.js` — state, Three.js scene, part filtering, coloring, download flow, URL-hash sharing, `sessionStorage` persistence.
-- `js/partsManifest.js` — single source of truth: parts, variants, compatibility rules, transforms, file paths. The header docblock is the canonical reference for adding a part.
+- `index.html` — single-page UI: config sidebar (widgets rendered from the manifest) + 3D viewer.
+- `js/app.js` — state, Three.js scene, composite-model loading, visibility + color application, URL-hash sharing, `sessionStorage` persistence.
+- `js/manifest_rules.js` — pure rules engine: config defaults, clause matching, part visibility. Mirrors CADScope `model_converter/spec.py`.
+- `js/sidecar_colors.js` — pure sidecar lookups: palette, autoAssign glob rules, per-node entries, category cascade helpers.
+- `js/options_ui.js` — renders `configOptions` into widgets (`radio` default, `dropdown`, `bool`; unknown types fall back to radio with a console warning).
+- `tests/` — node:test suites for the pure modules (`node --test tests/manifest_rules.test.js tests/sidecar_colors.test.js`).
 - `css/style.css` — dark-theme styles, CSS variables in `:root`.
-- `images/favicon.png` — favicon.
-- `assets/bg.hdr` — HDRI environment map used for image-based lighting / reflections (loaded via `RGBELoader` + `PMREMGenerator`).
-- `models/` — GLTF assets loaded by the viewer. **Not committed.** `partsManifest.basePath` is the relative path `"models/"`, so this directory must be served alongside the site for the 3D preview to work.
+- `assets/bg.hdr` — HDRI environment map (RGBELoader + PMREMGenerator).
+- `models/` — the three generated assets (composite GLB, `manifest.json`, `colors.json`). **Not committed** — populate with `./sync-models.sh` from a sibling CADScope checkout.
 
-Three.js 0.160.0 (GLTFLoader + DRACOLoader) is loaded from jsdelivr via the `<script type="importmap">` block in `index.html`. JSZip 3.10.1 is loaded from cdnjs. Inter font from Google Fonts.
+Three.js (GLTFLoader + DRACOLoader) is loaded via the `<script type="importmap">` block in `index.html`.
 
-## Running locally
+## Source of truth
 
-ES modules + CDN imports require an HTTP server, not `file://`:
-
-```sh
-python3 -m http.server 8000
-# then open http://localhost:8000
-```
+Everything the configurator shows is generated from **one hand-authored spec**: `CADScope/models/Prusawire_2026.R1.spec.yaml`, compiled by `CADScope/model_converter/build_configurator.py` into the manifest + color sidecar (schema reference: `CADScope/model_converter/SPEC.md`). Do not hand-edit the files in `models/`; edit the spec and regenerate.
 
 ## Key concepts
 
-- **Part matching** (`partMatchesConfig` in `js/app.js:597`) filters `partsManifest.parts` using three optional predicates per part: `requires` (all keys must equal), `requiresAny` (each listed key's config value must appear in its allowed array), `excludeIf` (any match disqualifies).
-- **STL-only parts** live in `partsManifest.stlOnlyParts`. They are bundled in downloads but never rendered.
-- **Colors**: most categories pull `state.mainColor` / `state.accentColor` (user-pickable). Sub-part routing is **manifest-driven**: a part (or its category) can declare a `colorMap` (and an optional `colorMapHex` for the multi-colour Hex Cowl variant) listing mesh names per role — `accent`, `main`, `hidden`. The router (`applyMaterial` in `js/app.js`) matches each mesh's name against those lists using a three-tier rule borrowed from CADScope: cleaned name (`cleanNodeName`), name with `-N` numeric suffix stripped, then parent name. Unmatched meshes inherit the part's category default from `getCategoryDefault`. Mesh names must come through the CADScope STEP→GLB pipeline (see README) so this matching is reliable.
-- **Transforms** in the manifest are in mm (position) and degrees (rotation). OnShape exports in meters; `globalScale: 1000` rescales on load and the per-part `transform` is applied after this scale.
-- **Downloads** stream from `https://raw.githubusercontent.com/Armchair-Heavy-Industries/A4T/main/STL/` and `.../3mf/`. Any Prusawire-specific files must be mirrored into that repo or `GITHUB_STL_BASE` / `GITHUB_3MF_BASE` in `app.js` updated to a new source.
-- **Sharing**: `getShareableState()` → base64-JSON → URL hash. Loaded by `loadStateFromHash()` on page load and `hashchange`. Falls back to `sessionStorage` (key: `a4t-config`).
-
-## Adding a part
-
-1. Export from OnShape as `.gltf` into `models/<Category>/`.
-2. Add an entry under the matching category in `partsManifest.parts`. The `file` field has no extension — `fileExtension` (`"gltf"`) is appended automatically. See the docblock at the top of `partsManifest.js` for the full template and transform conventions.
-3. STL download paths are derived from `file` unless overridden via `stlPath`. Hex-cowling variants prepend `"Hex "` to the filename and pull from the `/3mf/` base.
-4. If a new option exists (a new dropdown value, a new `wwbmg*` sub-config), wire it into `defaultConfig` and `validateConfig` in `app.js`, the matching `<select>` in `index.html`, and the relevant rules in `updateDisabledOptions`.
+- **Visibility**: every manifest part carries `nodes: [path]` plus optional `hidden` or `visible: { when, unless }` clauses. `evaluateVisible` (js/manifest_rules.js) resolves them against the current config — `when` must match, `unless` must not, AND across keys, array value = OR within a key. `applyConfig` in app.js toggles the matching scene subtrees.
+- **Node paths** are slash-joined cleaned names from the visual root, identical to CADScope's scaffold paths; `indexPartNodes` stamps each scene node's path into `userData.scaffoldPath` at load.
+- **Colors**: the sidecar cascade — a node's own `nodes:` entry category wins, then its own autoAssign glob match, then the nearest ancestor's category (`categoryFor` in js/sidecar_colors.js). `Main` and `Accent` use the user-pickable colors; other categories use palette color/metalness/opacity. Categories without a color (e.g. `Hidden`) leave the GLB material untouched.
+- **Options UI** is rendered from `manifest.configOptions` by js/options_ui.js; there is no hardcoded option markup.
+- **Compatibility** warnings render from the manifest's uniform `compatibility: [{when, incompatible, message}]` list (currently empty in the spec).
+- **Sharing**: `getShareableState()` → base64-JSON → URL hash, falling back to `sessionStorage` (key: `a4t-config`). Valid config keys come from the manifest's option ids.
+- **Downloads** are disabled (button hidden in index.html) until the spec's per-part `stl:` fields are populated.
 
 ## Naming caveat
 
-UI / branding say "Prusawire 2026.R1", but most identifiers, file paths, sessionStorage key (`a4t-config`), GitHub download base, and comments still say "A4T". Treat A4T-named code as the live system unless an explicit rename is in flight — don't reflexively rename it without scope agreement.
+UI / branding say "Prusawire 2026.R1", but some identifiers (notably the sessionStorage key `a4t-config`) still say "A4T". Treat A4T-named code as the live system unless an explicit rename is in flight — don't reflexively rename it without scope agreement.
