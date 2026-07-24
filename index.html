@@ -119,8 +119,17 @@
 
                 <!-- Loading Indicator -->
                 <div class="loading-indicator" id="loading">
-                    <div class="spinner-small"></div>
-                    <span id="loading-text">Loading...</span>
+                    <div class="loading-line">
+                        <div class="spinner-small"></div>
+                        <span id="loading-text">Loading...</span>
+                    </div>
+                    <div class="loading-progress">
+                        <div class="loading-progress-fill" id="loading-progress-fill"></div>
+                    </div>
+                    <div class="loading-line hidden" id="processing-line">
+                        <div class="spinner-small"></div>
+                        <span id="processing-text"></span>
+                    </div>
                 </div>
 
                 <!-- Attribution -->

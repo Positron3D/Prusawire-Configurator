@@ -45,6 +45,9 @@ dracoLoader.setDecoderConfig({ type: 'js' });
 
 const MODEL_ID = 'Prusawire_2026.R1';
 const MODELS_BASE = 'models/';
+// glTF assets are authored in meters; the scene, camera, and lights work in
+// millimeters, so the composite model is scaled up on load.
+const MODEL_SCALE = 1000;
 
 const state = {
     manifest: null,        // generated configurator manifest
@@ -308,6 +311,7 @@ function initThreeJS() {
             const envMap = pmrem.fromEquirectangular(texture).texture;
             scene.environment = envMap;
             texture.dispose();
+            requestRender();
         },
         undefined,
         (err) => console.warn('HDRI load failed:', err)
@@ -326,10 +330,11 @@ function initThreeJS() {
     // Handle resize
     window.addEventListener('resize', onWindowResize);
 
-    // Start render loop
-    animate();
+    // Renders are on-demand: user input re-renders via the change listener.
+    controls.addEventListener('change', requestRender);
+    requestRender();
 
-    // Loading overlay is hidden after models finish loading in updateConfiguration()
+    // Loading overlay is hidden by the bootstrap once the model is ready.
 }
 
 function setupLighting() {
@@ -367,14 +372,78 @@ function onWindowResize() {
     camera.aspect = width / height;
     camera.updateProjectionMatrix();
     renderer.setSize(width, height);
+    requestRender();
 }
 
-function animate() {
-    requestAnimationFrame(animate);
-    controls.update();
-    
-    // Render main scene
-    renderer.render(scene, camera);
+// Render-on-demand: a frame is drawn only when something changed. During an
+// in-flight camera animation, controls.update() is skipped so the damping
+// decay doesn't fight the lerp.
+let renderQueued = false;
+let cameraAnimation = null;     // { from, to, startedAt, duration }
+let defaultView = null;         // rest pose captured after the model loads
+let modelCenter = new THREE.Vector3();
+let modelSize = 1;
+const ANIM_DEFAULT = 600;       // view-button transitions
+const ANIM_ZOOM = 250;          // zoom / resetZoom
+
+function requestRender() {
+    if (renderQueued) return;
+    renderQueued = true;
+    requestAnimationFrame(() => {
+        renderQueued = false;
+        const stillAnimating = tickCameraAnimation();
+        if (!stillAnimating) controls.update();
+        renderer.render(scene, camera);
+        if (stillAnimating) requestRender();
+    });
+}
+
+function animateCameraTo(target, duration = ANIM_DEFAULT) {
+    cameraAnimation = {
+        from: {
+            position: camera.position.clone(),
+            quaternion: camera.quaternion.clone(),
+            up: camera.up.clone(),
+            target: controls.target.clone()
+        },
+        to: target,
+        startedAt: performance.now(),
+        duration
+    };
+    controls.enabled = false;
+    requestRender();
+}
+
+function tickCameraAnimation() {
+    if (!cameraAnimation) return false;
+    const t = Math.min(1, (performance.now() - cameraAnimation.startedAt) / cameraAnimation.duration);
+    const eased = t * t * (3 - 2 * t);
+    const { from, to } = cameraAnimation;
+    camera.position.lerpVectors(from.position, to.position, eased);
+    camera.quaternion.slerpQuaternions(from.quaternion, to.quaternion, eased);
+    camera.up.lerpVectors(from.up, to.up, eased);
+    controls.target.copy(from.target).lerp(to.target, eased);
+    camera.updateProjectionMatrix();
+    if (t >= 1) {
+        cameraAnimation = null;
+        controls.enabled = true;
+        return false;
+    }
+    return true;
+}
+
+// Build a target pose looking at modelCenter from a given direction at the
+// canonical model-fit distance. Used by all axis-view buttons.
+function poseFromDirection(direction, up) {
+    const distance = modelSize * 1.5;
+    const eye = modelCenter.clone().addScaledVector(direction.clone().normalize(), distance);
+    const m = new THREE.Matrix4().lookAt(eye, modelCenter, up);
+    return {
+        position: eye,
+        quaternion: new THREE.Quaternion().setFromRotationMatrix(m),
+        up: up.clone(),
+        target: modelCenter.clone()
+    };
 }
 
 // ============================================
@@ -390,24 +459,61 @@ gltfLoader.setDRACOLoader(dracoLoader);
 function loadCompositeModel() {
     const url = MODELS_BASE + state.manifest.glb;
     const loadingText = document.getElementById('loading-text');
+    const progressFill = document.getElementById('loading-progress-fill');
+    const processingLine = document.getElementById('processing-line');
+    const processingText = document.getElementById('processing-text');
+    loadingText.textContent = 'Retrieving 3D model...';
     return new Promise((resolve, reject) => {
         gltfLoader.load(
             url,
             (gltf) => {
+                gltf.scene.scale.setScalar(MODEL_SCALE);
                 state.sceneRoot = (gltf.scene.children.length === 1 && gltf.scene.name === 'Scene')
                     ? gltf.scene.children[0]
                     : gltf.scene;
                 indexPartNodes();
                 modelGroup.add(gltf.scene);
+
+                // Fit the camera and clipping planes to the loaded assembly.
+                const box = new THREE.Box3().setFromObject(modelGroup);
+                modelSize = box.getSize(new THREE.Vector3()).length();
+                modelCenter = box.getCenter(new THREE.Vector3());
+                camera.near = modelSize * 0.001;
+                camera.far = modelSize * 100;
+                const dir = new THREE.Vector3(0.4, 0.25, 0.88).normalize();
+                camera.position.copy(modelCenter).addScaledVector(dir, modelSize * 1.2);
+                controls.target.copy(modelCenter);
+                camera.up.set(0, 1, 0);
+                camera.lookAt(modelCenter);
+                camera.updateProjectionMatrix();
+                controls.update();
+
+                // Snapshot the rest pose so Home animates back to this view.
+                defaultView = {
+                    position: camera.position.clone(),
+                    quaternion: camera.quaternion.clone(),
+                    up: camera.up.clone(),
+                    target: controls.target.clone()
+                };
+                requestRender();
                 resolve();
             },
             (progress) => {
-                if (loadingText && progress.total) {
-                    const pct = Math.round((progress.loaded / progress.total) * 100);
-                    loadingText.textContent = `Loading model... ${pct}%`;
+                if (!progress.total) return;
+                const pct = Math.min(100, (progress.loaded / progress.total) * 100).toFixed(0);
+                progressFill.style.width = `${pct}%`;
+                loadingText.textContent = `Retrieving 3D model... ${pct}%`;
+                if (pct >= 100 && processingLine.classList.contains('hidden')) {
+                    processingText.textContent = loadingPhrases[Math.floor(Math.random() * loadingPhrases.length)] + '...';
+                    processingLine.classList.remove('hidden');
                 }
             },
-            reject
+            (error) => {
+                console.error('Error loading model:', error);
+                loadingText.textContent = 'Failed to load model.';
+                processingLine.classList.add('hidden');
+                reject(error);
+            }
         );
     });
 }
@@ -459,6 +565,7 @@ function applyConfig() {
             node.visible = visible;
         }
     }
+    requestRender();
 }
 
 /**
@@ -509,6 +616,7 @@ function applyColors() {
     for (const child of state.sceneRoot.children) {
         walk(child, null);
     }
+    requestRender();
 }
 
 /**
@@ -551,63 +659,48 @@ function updateWarnings(warnings) {
 }
 
 function centerCameraOnModels() {
-    // Reset to preferred default view
-    camera.position.set(143.84, 82.10, 285.96);
-    controls.target.set(0.91, 25.89, -35.32);
-    controls.update();
+    if (defaultView) {
+        animateCameraTo(defaultView, ANIM_DEFAULT);
+    }
 }
 
 /**
- * Frame the model group from one of the six axis-aligned directions, or
- * return to the predefined home view. Distance is derived from the current
- * scene bounding box so the framing fits whatever assembly is loaded.
+ * Animate to one of the six axis-aligned views, or back to the captured
+ * home pose. Distance derives from the loaded model's bounding size.
  */
 function setView(view) {
     if (view === 'home') {
         centerCameraOnModels();
         return;
     }
-
-    const box = new THREE.Box3().setFromObject(modelGroup);
-    if (box.isEmpty()) return;
-    const center = box.getCenter(new THREE.Vector3());
-    const distance = box.getSize(new THREE.Vector3()).length() * 1.5;
-
-    const offset = new THREE.Vector3();
-    switch (view) {
-        case 'top':    offset.set(0, distance, 0); break;
-        case 'bottom': offset.set(0, -distance, 0); break;
-        case 'front':  offset.set(0, 0, distance); break;
-        case 'back':   offset.set(0, 0, -distance); break;
-        case 'left':   offset.set(-distance, 0, 0); break;
-        case 'right':  offset.set(distance, 0, 0); break;
-        default: return;
-    }
-
-    controls.target.copy(center);
-    camera.position.copy(center).add(offset);
-    camera.up.set(0, 1, 0);
-    camera.lookAt(center);
-    controls.update();
+    const views = {
+        top:    [new THREE.Vector3(0, 1, 0),  new THREE.Vector3(0, 0, -1)],
+        bottom: [new THREE.Vector3(0, -1, 0), new THREE.Vector3(0, 0, 1)],
+        front:  [new THREE.Vector3(0, 0, 1),  new THREE.Vector3(0, 1, 0)],
+        back:   [new THREE.Vector3(0, 0, -1), new THREE.Vector3(0, 1, 0)],
+        left:   [new THREE.Vector3(-1, 0, 0), new THREE.Vector3(0, 1, 0)],
+        right:  [new THREE.Vector3(1, 0, 0),  new THREE.Vector3(0, 1, 0)]
+    };
+    const entry = views[view];
+    if (!entry) return;
+    animateCameraTo(poseFromDirection(entry[0], entry[1]), ANIM_DEFAULT);
 }
 
 /**
- * Multiplicative zoom relative to the current camera-target distance.
- * Positive factor zooms out, negative zooms in (matches CADScope buttons).
- * Clamped to [0.1×, 10×] of the model's bounding-box diagonal.
+ * Multiplicative zoom relative to the current camera-target distance,
+ * animated. Positive factor zooms out, negative zooms in. Clamped to
+ * [0.1x, 10x] of the model's bounding size.
  */
 function zoom(factor) {
     const dirVec = new THREE.Vector3().subVectors(camera.position, controls.target).normalize();
     const distance = camera.position.distanceTo(controls.target);
-
-    const box = new THREE.Box3().setFromObject(modelGroup);
-    const modelSize = box.isEmpty() ? 100 : box.getSize(new THREE.Vector3()).length();
-    const minDist = modelSize * 0.1;
-    const maxDist = modelSize * 10;
-    const clamped = Math.max(minDist, Math.min(maxDist, distance * (1 + factor)));
-
-    camera.position.copy(controls.target).addScaledVector(dirVec, clamped);
-    controls.update();
+    const clamped = Math.max(modelSize * 0.1, Math.min(modelSize * 10, distance * (1 + factor)));
+    animateCameraTo({
+        position: controls.target.clone().addScaledVector(dirVec, clamped),
+        quaternion: camera.quaternion.clone(),
+        up: camera.up.clone(),
+        target: controls.target.clone()
+    }, ANIM_ZOOM);
 }
 
 function resetZoom() {
@@ -638,6 +731,7 @@ function setupEventListeners() {
             for (const { light, base } of baseLightIntensities) {
                 light.intensity = base * scale;
             }
+            requestRender();
         });
     }
 
@@ -744,6 +838,7 @@ function toggleWireframe() {
             child.material.wireframe = state.wireframe;
         }
     });
+    requestRender();
 }
 
 // ============================================
@@ -787,11 +882,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupEventListeners();
     syncUIToState();
 
-    const loadingText = document.getElementById('loading-text');
-    const phrase = loadingPhrases[Math.floor(Math.random() * loadingPhrases.length)];
-    loadingText.textContent = phrase + '...';
     document.getElementById('loading').classList.remove('hidden');
-    await loadCompositeModel();
+    try {
+        await loadCompositeModel();
+    } catch (error) {
+        console.error('Model load failed:', error);
+        return;
+    }
     applyColors();
     updateConfiguration();
     document.getElementById('loading').classList.add('hidden');
