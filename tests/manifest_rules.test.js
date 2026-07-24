@@ -1,0 +1,101 @@
+// ABOUTME: Unit tests for the manifest rules engine (defaults, clause
+// ABOUTME: matching, part visibility). Run with: node --test tests/manifest_rules.test.js
+
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+
+import {
+  defaultConfig,
+  matchesClause,
+  evaluateVisible,
+  validConfigKeys,
+} from '../js/manifest_rules.js';
+
+const OPTIONS = {
+  pulley_size: {
+    label: 'Pulley Size',
+    type: 'radio',
+    choices: [
+      { id: '16t', label: '16T', default: true },
+      { id: '20t', label: '20T', default: false },
+    ],
+  },
+  mainboard: {
+    label: 'Mainboard',
+    type: 'radio',
+    choices: [
+      { id: 'rambo', label: 'Einsy Rambo', default: false },
+      { id: 'skr', label: 'SKR Mini E3', default: false },
+    ],
+  },
+  hexCowl: { label: 'Hex?', type: 'bool', default: true },
+};
+
+test('defaultConfig picks the flagged default choice', () => {
+  assert.equal(defaultConfig(OPTIONS).pulley_size, '16t');
+});
+
+test('defaultConfig falls back to the first choice when none flagged', () => {
+  assert.equal(defaultConfig(OPTIONS).mainboard, 'rambo');
+});
+
+test('defaultConfig uses bool defaults', () => {
+  assert.equal(defaultConfig(OPTIONS).hexCowl, true);
+});
+
+test('matchesClause: single key equality', () => {
+  assert.equal(matchesClause({ mainboard: 'skr' }, { mainboard: 'skr' }), true);
+  assert.equal(matchesClause({ mainboard: 'skr' }, { mainboard: 'rambo' }), false);
+});
+
+test('matchesClause: AND across keys', () => {
+  const clause = { rod_diameter: '8mm', frame_type: 'mk4' };
+  assert.equal(matchesClause(clause, { rod_diameter: '8mm', frame_type: 'mk4' }), true);
+  assert.equal(matchesClause(clause, { rod_diameter: '8mm', frame_type: 'mk3' }), false);
+});
+
+test('matchesClause: array value is OR within a key', () => {
+  const clause = { hotend: ['revo', 'dragon'] };
+  assert.equal(matchesClause(clause, { hotend: 'dragon' }), true);
+  assert.equal(matchesClause(clause, { hotend: 'rapido' }), false);
+});
+
+test('matchesClause: missing config key never matches', () => {
+  assert.equal(matchesClause({ mainboard: 'skr' }, {}), false);
+});
+
+test('evaluateVisible: no rules means visible', () => {
+  assert.equal(evaluateVisible({ id: 'x', nodes: ['x'] }, {}), true);
+});
+
+test('evaluateVisible: hidden wins over everything', () => {
+  const part = { id: 'x', nodes: ['x'], hidden: true, visible: { when: { a: 'b' } } };
+  assert.equal(evaluateVisible(part, { a: 'b' }), false);
+});
+
+test('evaluateVisible: when must match', () => {
+  const part = { id: 'x', nodes: ['x'], visible: { when: { pulley_size: '20t' } } };
+  assert.equal(evaluateVisible(part, { pulley_size: '20t' }), true);
+  assert.equal(evaluateVisible(part, { pulley_size: '16t' }), false);
+});
+
+test('evaluateVisible: unless must not match', () => {
+  const part = { id: 'x', nodes: ['x'], visible: { unless: { psu: 'mk3_silver' } } };
+  assert.equal(evaluateVisible(part, { psu: 'mk3_silver' }), false);
+  assert.equal(evaluateVisible(part, { psu: 'delta_black' }), true);
+});
+
+test('evaluateVisible: when and unless combine', () => {
+  const part = {
+    id: 'x', nodes: ['x'],
+    visible: { when: { a: '1' }, unless: { b: '2' } },
+  };
+  assert.equal(evaluateVisible(part, { a: '1', b: '3' }), true);
+  assert.equal(evaluateVisible(part, { a: '1', b: '2' }), false);
+  assert.equal(evaluateVisible(part, { a: '0', b: '3' }), false);
+});
+
+test('validConfigKeys lists the option ids', () => {
+  assert.deepEqual(validConfigKeys(OPTIONS).sort(),
+                   ['hexCowl', 'mainboard', 'pulley_size']);
+});
