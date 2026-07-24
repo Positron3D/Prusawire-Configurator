@@ -81,7 +81,19 @@ body {
 
 .header-links {
     display: flex;
+    align-items: center;
     gap: 1rem;
+}
+
+.header-links .cadscope-link {
+    padding: 0.3rem 0.7rem;
+    border: 1px solid var(--accent);
+    border-radius: 6px;
+}
+
+.header-links .cadscope-link:hover {
+    border-color: var(--accent-hover);
+    color: var(--text-primary);
 }
 
 .header-links a {
