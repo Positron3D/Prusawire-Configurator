@@ -896,7 +896,10 @@ async function downloadParts() {
         const downloadUrl = URL.createObjectURL(zipBlob);
         const a = document.createElement('a');
         a.href = downloadUrl;
-        a.download = 'Prusawire-STLs.zip';
+        const now = new Date();
+        const pad = (n) => String(n).padStart(2, '0');
+        const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}`;
+        a.download = `Prusawire-STLs_${stamp}.zip`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
