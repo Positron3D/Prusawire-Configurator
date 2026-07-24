@@ -113,6 +113,14 @@
                     <input type="range" id="brightness-slider" min="0" max="200" value="150" title="Brightness">
                 </div>
 
+                <!-- Mobile warning: shown instead of auto-loading the model -->
+                <div class="mobile-warning hidden" id="mobile-warning">
+                    <p><strong>Best viewed on a desktop browser.</strong></p>
+                    <p>The 3D preview downloads an ~80&nbsp;MB model, which can
+                       crash mobile browsers or eat into a data plan.</p>
+                    <button class="btn-download" id="mobile-load-btn">Load the 3D model anyway</button>
+                </div>
+
                 <!-- Loading Indicator -->
                 <div class="loading-indicator" id="loading">
                     <div class="loading-line">

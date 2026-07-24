@@ -849,6 +849,38 @@ function setupScrollIndicator() {
 }
 
 /**
+ * Mobile-ish detection by capability: coarse pointer plus a small screen.
+ * Used to gate the heavy model download behind an explicit tap.
+ */
+function isProbablyMobile() {
+    const coarse = window.matchMedia('(pointer: coarse)').matches;
+    const shortEdge = Math.min(window.screen.width, window.screen.height);
+    return coarse && shortEdge < 820;
+}
+
+/**
+ * On mobile, show a best-on-desktop warning and resolve only when the user
+ * explicitly asks to load the model. Desktop resolves immediately.
+ */
+function confirmMobileLoad() {
+    const warning = document.getElementById('mobile-warning');
+    if (!warning || !isProbablyMobile()) {
+        return Promise.resolve();
+    }
+    const controls = document.querySelector('.viewer-controls');
+    document.getElementById('loading').classList.add('hidden');
+    controls.style.display = 'none';
+    warning.classList.remove('hidden');
+    return new Promise((resolve) => {
+        document.getElementById('mobile-load-btn').addEventListener('click', () => {
+            warning.classList.add('hidden');
+            controls.style.display = '';
+            resolve();
+        }, { once: true });
+    });
+}
+
+/**
  * Fetch the manifest-selected STL set and hand the user a ZIP. The base URL
  * comes from the manifest; a ?stlBase= query param overrides it for local
  * testing against a served copy of the STL tree.
@@ -967,6 +999,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupEventListeners();
     syncUIToState();
 
+    await confirmMobileLoad();
     document.getElementById('loading').classList.remove('hidden');
     try {
         await loadCompositeModel();
