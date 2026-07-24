@@ -12,6 +12,8 @@ python3 -m http.server 8000
 # open http://localhost:8000
 ```
 
+STL downloads fetch from the Prusawire GitHub repo (`downloads.base` in the manifest). For local testing, `sync-models.sh` links `stls/` to a sibling `Prusawire-erikbuild/STLs` checkout — open `http://localhost:8000/?stlBase=stls/` to download from it instead.
+
 ## Authoring the model and options
 
 The configurator is entirely data-driven by three generated files in `models/` (gitignored — supplied by `sync-models.sh` or at deploy time):

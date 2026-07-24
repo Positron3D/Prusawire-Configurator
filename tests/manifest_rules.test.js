@@ -9,6 +9,7 @@ import {
   matchesClause,
   evaluateVisible,
   validConfigKeys,
+  downloadFileList,
 } from '../js/manifest_rules.js';
 
 const OPTIONS = {
@@ -98,4 +99,31 @@ test('evaluateVisible: when and unless combine', () => {
 test('validConfigKeys lists the option ids', () => {
   assert.deepEqual(validConfigKeys(OPTIONS).sort(),
                    ['hexCowl', 'mainboard', 'pulley_size']);
+});
+
+const DOWNLOADS = {
+  base: 'https://example.com/STLs/',
+  always: ['Tools/a.stl'],
+  groups: [
+    { when: { pulley_size: '16t' }, files: ['Y/b16.stl'] },
+    { when: { pulley_size: '20t' }, files: ['Y/b20.stl'] },
+    { when: { psu: 'delta_black' }, files: ['Tools/a.stl', 'E/cover.stl'] },
+  ],
+};
+
+test('downloadFileList includes always plus matching groups', () => {
+  assert.deepEqual(
+    downloadFileList(DOWNLOADS, { pulley_size: '16t', psu: 'mk3_silver' }),
+    ['Tools/a.stl', 'Y/b16.stl']);
+});
+
+test('downloadFileList dedupes across always and groups', () => {
+  assert.deepEqual(
+    downloadFileList(DOWNLOADS, { pulley_size: '20t', psu: 'delta_black' }),
+    ['Tools/a.stl', 'Y/b20.stl', 'E/cover.stl']);
+});
+
+test('downloadFileList handles missing sections', () => {
+  assert.deepEqual(downloadFileList(undefined, {}), []);
+  assert.deepEqual(downloadFileList({ base: 'x' }, {}), []);
 });

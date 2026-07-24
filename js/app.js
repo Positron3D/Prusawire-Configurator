@@ -8,7 +8,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
-import { defaultConfig as buildDefaultConfig, matchesClause, evaluateVisible, validConfigKeys } from './manifest_rules.js';
+import { defaultConfig as buildDefaultConfig, matchesClause, evaluateVisible, validConfigKeys, downloadFileList } from './manifest_rules.js';
 import { buildSidecarLookups, extendPath, categoryFor } from './sidecar_colors.js';
 import { renderOptions } from './options_ui.js';
 
@@ -753,6 +753,9 @@ function setupEventListeners() {
         }
     });
 
+    // Download button
+    document.getElementById('download-btn').addEventListener('click', downloadParts);
+
     // Copy URL button
     const copyUrlBtn = document.getElementById('copy-url-btn');
     if (copyUrlBtn) {
@@ -841,6 +844,76 @@ function toggleWireframe() {
     requestRender();
 }
 
+/**
+ * Fetch the manifest-selected STL set and hand the user a ZIP. The base URL
+ * comes from the manifest; a ?stlBase= query param overrides it for local
+ * testing against a served copy of the STL tree.
+ */
+async function downloadParts() {
+    const downloads = state.manifest.downloads;
+    if (!downloads) return;
+    const base = new URLSearchParams(window.location.search).get('stlBase') || downloads.base;
+    const files = downloadFileList(downloads, state.config);
+    const downloadBtn = document.getElementById('download-btn');
+    const originalText = downloadBtn.textContent;
+    downloadBtn.disabled = true;
+    downloadBtn.textContent = 'Preparing download...';
+
+    try {
+        const zip = new JSZip();
+        const folder = zip.folder('Prusawire-STLs');
+        let completed = 0;
+
+        const results = await Promise.all(files.map(async (filePath) => {
+            const encodedPath = filePath.split('/').map(encodeURIComponent).join('/');
+            try {
+                const response = await fetch(base + encodedPath);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                // Keep the repo's folder structure inside the ZIP so
+                // same-named variant files cannot collide.
+                folder.file(filePath, await response.blob());
+                return { success: true, file: filePath };
+            } catch (error) {
+                console.error(`Failed to fetch ${filePath}:`, error);
+                return { success: false, file: filePath };
+            } finally {
+                completed++;
+                downloadBtn.textContent = `Downloading... ${completed}/${files.length}`;
+            }
+        }));
+
+        const failures = results.filter(r => !r.success);
+        downloadBtn.textContent = 'Creating ZIP...';
+        const zipBlob = await zip.generateAsync(
+            { type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 2 } },
+            (metadata) => {
+                downloadBtn.textContent = `Creating ZIP... ${Math.round(metadata.percent)}%`;
+            }
+        );
+
+        const downloadUrl = URL.createObjectURL(zipBlob);
+        const a = document.createElement('a');
+        a.href = downloadUrl;
+        a.download = 'Prusawire-STLs.zip';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(downloadUrl);
+
+        if (failures.length > 0) {
+            alert(`Download complete!\n\n${failures.length} file(s) could not be fetched:\n${failures.map(f => f.file).join('\n')}`);
+        }
+    } catch (error) {
+        console.error('Download failed:', error);
+        alert('Download failed: ' + error.message);
+    } finally {
+        downloadBtn.disabled = false;
+        downloadBtn.textContent = originalText;
+    }
+}
+
 // ============================================
 // Initialize
 // ============================================
@@ -855,6 +928,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     ]);
     state.manifest = manifest;
     state.lookups = buildSidecarLookups(sidecar);
+    document.getElementById('download-btn').disabled = !manifest.downloads;
     state.mainColor = paletteColorInt('Main');
     state.accentColor = paletteColorInt('Accent');
     state.config = buildDefaultConfig(manifest.configOptions);

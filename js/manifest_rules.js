@@ -46,3 +46,24 @@ export function evaluateVisible(part, config) {
 export function validConfigKeys(configOptions) {
   return Object.keys(configOptions || {});
 }
+
+// Resolve the ZIP download contents for a config: the always-included files
+// plus each group whose when-clause matches, deduped in declaration order.
+export function downloadFileList(downloads, config) {
+    if (!downloads) return [];
+    const files = [];
+    const seen = new Set();
+    const push = (f) => {
+        if (!seen.has(f)) {
+            seen.add(f);
+            files.push(f);
+        }
+    };
+    for (const f of downloads.always || []) push(f);
+    for (const group of downloads.groups || []) {
+        if (matchesClause(group.when || {}, config)) {
+            for (const f of group.files || []) push(f);
+        }
+    }
+    return files;
+}

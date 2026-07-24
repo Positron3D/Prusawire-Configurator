@@ -10,3 +10,10 @@ for f in "$MODEL.glb" "$MODEL.manifest.json" "$MODEL.colors.json"; do
     cp "$SRC/$f" "models/$f"
     echo "synced models/$f"
 done
+
+# Link a local STL tree for dev downloads (serve with ?stlBase=stls/).
+STL_SRC="${STL_SRC:-../Prusawire-erikbuild/STLs}"
+if [ -d "$STL_SRC" ]; then
+    ln -sfn "$(cd "$STL_SRC" && pwd)" stls
+    echo "linked stls -> $STL_SRC"
+fi
