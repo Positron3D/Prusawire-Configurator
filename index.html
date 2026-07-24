@@ -48,116 +48,9 @@
                     </div>
                 </section>
                 
-                <!-- Frame Selection -->
-                <section class="config-section">
-                    <h3>Frame</h3>
-                    <select name="frameType">
-                        <option value="MK3" selected>MK3</option>
-                        <option value="MK4">MK4</option>
-                    </select>
-                    <p class="section-note" id="frame-note">Prusa MK4 frame is thicker than the original MK3 frame.  If you upgraded your MK3 to a MK4, you probably still have the MK3 frame.</p>
-                </section>
-
-                <!-- Y Axis Bearing Mount Selection -->
-                <section class="config-section">
-                    <h3>Y-Axis Bearing Mount</h3>
-                    <select name="yAxisBearingMount">
-                        <option value="BearingClips" selected>Bearing Clips</option>
-                        <option value="UBolt">UBolt</option>
-                    </select>
-                    <p class="section-note" id="y-axis-bearing-mount-note">Use whatever you have from your existing setup; If you have to buy new, the bearing clips are nicer!</p>
-                </section>
-
-                <!-- Square Nuts Selection -->
-                <section class="config-section">
-                    <h3>Square Nuts</h3>
-                    <select name="squareNuts">
-                        <option value="M3S" selected>Prusa-style M3 Square Nuts</option>
-                        <option value="V0S">Voron-style V0 1515 Square Nuts</option>
-                    </select>
-                </section>
-                
-                <!-- Motor Pulley Selection -->
-                <section class="config-section">
-                    <h3>Motor Pulley</h3>
-                    <select name="motorPulley">
-                        <option value="16T" selected>16T GT2 Pulley (Prusa stock)</option>
-                        <option value="20T">20T GT2 Pulley</option>
-                    </select>
-                </section>
-
-                <!-- Z Rods Selection -->
-                <section class="config-section">
-                    <h3>Z Linear Rods</h3>
-                    <select name="zRods">
-                        <option value="10x325" selected>10mm x 325mm Z Rods</option>
-                        <option value="8x320">8mm x 320mm Z Rods (Prusa MK3 Spec)</option>
-                        <option disabled>──────────</option>
-                        <option value="8x325">8mm x 325mm Z Rods</option>
-                        <option value="8x330">8mm x 330mm Z Rods</option>
-                        <option value="10x320">10mm x 320mm Z Rods</option>
-                        <option value="10x330">10mm x 330mm Z Rods</option>
-                        <option value="10x341">10mm x 341mm Z Rods</option>
-                    </select>
-                </section>
-
-                <!-- Extruder Selection -->
-                <section class="config-section">
-                    <h3>Extruder</h3>
-                    <select name="extruder">
-                        <option value="wwbmg" selected>Wrist Watch BMG for A4T</option>
-                        <option value="sherpa-mini">Sherpa Mini</option>
-                        <option value="wwg2">Wrist Watch G2</option>
-                        <option value="orbiter">Orbiter 2.0</option>
-                        <option value="lgx-lite">LGX Lite</option>
-                        <option value="vz-hextrudort">VZ-Hextrudort</option>
-                    </select>
-                    <!-- WW-BMG sub-options (only visible when WW-BMG selected) -->
-                    <div class="sub-options" id="wwbmg-options">
-                        <span class="sub-options-label">Sensor options</span>
-                        <select name="wwbmg-sensors">
-                            <option value="no-sensors" selected>No Sensors</option>
-                            <option value="single-sensor">Single Sensor</option>
-                            <option value="dual-sensors">Dual Sensors</option>
-                        </select>
-                        <span class="sub-options-label">Idler options</span>
-                        <select name="wwbmg-idler">
-                            <option value="smooth-bearing" selected>Smooth Bearing</option>
-                            <option value="bmg-dual-drive">BMG Dual Drive</option>
-                        </select>
-                    </div>
-                </section>
-
-                <!-- Toolhead Board Selection (Xol Carriage only) -->
-                <section class="config-section" id="toolhead-board-section">
-                    <h3>Toolhead Board</h3>
-                    <p class="section-note" id="toolhead-note-tap">Board mounts from A4T are designed for Xol-Carriage only. If using CW2/Tap, source a "36" sized toolhead board mount for your extruder elsewhere.</p>
-                    <p class="section-note" id="toolhead-note-xol" style="display: none;">Greyed out options indicate a mount hasn't been designed for that board/extruder combination yet. You can source one elsewhere, or design one and <a href="https://github.com/Armchair-Heavy-Industries/A4T" target="_blank">submit it to the GitHub</a> as a contribution to the project!</p>
-                    <select name="toolhead-board">
-                        <option value="none" selected>None</option>
-                        <option value="ebb36-sht36v2">BTT EBB 36 v1.2 / Fly SHT36v2</option>
-                        <option value="h36">Fysetc H36</option>
-                        <option value="nh36">LDO Nitehawk 36</option>
-                        <option value="sht36v3">Fly SHT36v3</option>
-                        <option value="xol-pcb">Xol PCB</option>
-                    </select>
-                </section>
-
-                <!-- Options -->
-                <section class="config-section">
-                    <h3>Options</h3>
-                    <div class="option-group" data-config="options">
-                        <p class="section-note crossbow-uhf-note" id="crossbow-uhf-note" style="display: none;">Crossbow is not officially supported on UHF cowls. Select a different hotend or see <a href="https://github.com/Armchair-Heavy-Industries/Armchair-Usermods/blob/main/files/A4T%20CrossBow" target="_blank">Armchair Usermods GitHub repo</a> for options.</p>
-                        <label class="option checkbox">
-                            <input type="checkbox" name="filament-cutter" value="crossbow">
-                            <span class="option-label">Crossbow Filament Cutter</span>
-                        </label>
-                        <label class="option checkbox">
-                            <input type="checkbox" name="hex-cowl" value="hex-cowl">
-                            <span class="option-label">Multi-colour Hex Cowl (.3mf)</span>
-                        </label>
-                    </div>
-                </section>
+                <!-- Option widgets are rendered here from the manifest's
+                     configOptions by js/options_ui.js -->
+                <div id="option-sections"></div>
 
                 <!-- Warnings -->
                 <section class="config-section warnings" id="warnings">
@@ -166,7 +59,8 @@
 
                 <!-- Download Button -->
                 <div class="download-section">
-                    <button class="btn-download" id="download-btn">
+                    <!-- Hidden until the spec's stl: download paths are populated -->
+                    <button class="btn-download" id="download-btn" style="display: none;">
                         Download Selected Parts
                     </button>
                     <button class="btn-copy-url" id="copy-url-btn">
