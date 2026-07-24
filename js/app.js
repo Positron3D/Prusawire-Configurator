@@ -56,7 +56,7 @@ const state = {
     partNodes: new Map(),  // manifest part id -> scene nodes
     sceneRoot: null,       // composite model root (glTF Scene wrapper skipped)
     config: {},            // current option choices, keyed by option id
-    wireframe: false,
+    colorsPicked: false,   // colors persist/share only once the user picks one
     mainColor: 0x797979,   // overwritten from the palette at load
     accentColor: 0x9F6204
 };
@@ -69,11 +69,12 @@ const state = {
  * Extract shareable state (config + colors)
  */
 function getShareableState() {
-    return {
-        config: state.config,
-        mainColor: state.mainColor,
-        accentColor: state.accentColor
-    };
+    const shareable = { v: 2, config: state.config };
+    if (state.colorsPicked) {
+        shareable.mainColor = state.mainColor;
+        shareable.accentColor = state.accentColor;
+    }
+    return shareable;
 }
 
 /**
@@ -161,12 +162,15 @@ function loadStateFromHash() {
         Object.assign(state.config, validatedConfig);
     }
 
-    // Merge colors
-    if (decoded.mainColor !== undefined) {
+    // Merge colors — only from v2+ payloads, so stale pre-palette
+    // sessions cannot override the sidecar defaults.
+    if (decoded.v >= 2 && decoded.mainColor !== undefined) {
         state.mainColor = decoded.mainColor;
+        state.colorsPicked = true;
     }
-    if (decoded.accentColor !== undefined) {
+    if (decoded.v >= 2 && decoded.accentColor !== undefined) {
         state.accentColor = decoded.accentColor;
+        state.colorsPicked = true;
     }
 
     return true;
@@ -178,7 +182,7 @@ function loadStateFromHash() {
 function saveStateToSession() {
     try {
         const shareableState = getShareableState();
-        sessionStorage.setItem('a4t-config', JSON.stringify(shareableState));
+        sessionStorage.setItem('prusawire-config', JSON.stringify(shareableState));
     } catch (e) {
         console.warn('Failed to save to session storage:', e);
     }
@@ -189,7 +193,7 @@ function saveStateToSession() {
  */
 function loadStateFromSession() {
     try {
-        const stored = sessionStorage.getItem('a4t-config');
+        const stored = sessionStorage.getItem('prusawire-config');
         if (!stored) return false;
 
         const decoded = JSON.parse(stored);
@@ -201,12 +205,15 @@ function loadStateFromSession() {
             Object.assign(state.config, validatedConfig);
         }
 
-        // Merge colors
-        if (decoded.mainColor !== undefined) {
+        // Merge colors — only from v2+ payloads, so stale pre-palette
+        // sessions cannot override the sidecar defaults.
+        if (decoded.v >= 2 && decoded.mainColor !== undefined) {
             state.mainColor = decoded.mainColor;
+            state.colorsPicked = true;
         }
-        if (decoded.accentColor !== undefined) {
+        if (decoded.v >= 2 && decoded.accentColor !== undefined) {
             state.accentColor = decoded.accentColor;
+            state.colorsPicked = true;
         }
 
         return true;
@@ -223,7 +230,8 @@ function resetToDefaults() {
     state.config = buildDefaultConfig(state.manifest.configOptions);
     state.mainColor = paletteColorInt('Main');
     state.accentColor = paletteColorInt('Accent');
-    sessionStorage.removeItem('a4t-config');
+    state.colorsPicked = false;
+    sessionStorage.removeItem('prusawire-config');
     syncUIToState();
     applyColors();
     updateConfiguration();
@@ -601,8 +609,7 @@ function applyColors() {
                     metalness: entry.metalness,
                     roughness: 0.7,
                     transparent: entry.opacity < 1.0,
-                    opacity: entry.opacity,
-                    wireframe: state.wireframe
+                    opacity: entry.opacity
                 });
             }
         }
@@ -729,7 +736,6 @@ function setupEventListeners() {
     document.getElementById('btn-zoom-out').addEventListener('click', () => zoom(0.2));
     document.getElementById('btn-zoom-in').addEventListener('click', () => zoom(-0.2));
     document.getElementById('btn-zoom-reset').addEventListener('click', resetZoom);
-    document.getElementById('btn-wireframe').addEventListener('click', toggleWireframe);
 
     // Brightness slider scales hemi + directional lights against their base intensities
     const brightnessSlider = document.getElementById('brightness-slider');
@@ -748,6 +754,7 @@ function setupEventListeners() {
         const colorValue = parseInt(e.target.value.replace('#', ''), 16);
         if (!isNaN(colorValue)) {
             state.mainColor = colorValue;
+            state.colorsPicked = true;
             applyColors();
             saveStateToSession();
         }
@@ -756,6 +763,7 @@ function setupEventListeners() {
         const colorValue = parseInt(e.target.value.replace('#', ''), 16);
         if (!isNaN(colorValue)) {
             state.accentColor = colorValue;
+            state.colorsPicked = true;
             applyColors();
             saveStateToSession();
         }
@@ -838,18 +846,6 @@ function setupScrollIndicator() {
     
     // Initial check (with slight delay to ensure content is rendered)
     setTimeout(updateScrollIndicator, RENDER_DELAY_MS);
-}
-
-function toggleWireframe() {
-    state.wireframe = !state.wireframe;
-    document.getElementById('btn-wireframe').classList.toggle('active', state.wireframe);
-    
-    modelGroup.traverse((child) => {
-        if (child.isMesh) {
-            child.material.wireframe = state.wireframe;
-        }
-    });
-    requestRender();
 }
 
 /**

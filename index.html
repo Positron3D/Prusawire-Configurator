@@ -18,7 +18,7 @@
         <!-- Header -->
         <header class="header">
             <div class="logo">
-                <h1>Prusawire 2026.R1</h1>
+                <h1>Prusawire 2026.R1 Configurator</h1>
                 <span class="subtitle">by Positron3D</span>
             </div>
             <div class="header-links">
@@ -31,7 +31,19 @@
             <!-- Configuration Panel -->
             <aside class="config-panel">
                 <div class="config-panel-content">
-                <h2>Configuration</h2>
+
+                <!-- Download Button -->
+                <div class="download-section">
+                    <button class="btn-download" id="download-btn">
+                        Download STLs
+                    </button>
+                    <button class="btn-copy-url" id="copy-url-btn">
+                        Share Config URL
+                    </button>
+                    <button class="btn-reset" id="reset-btn">
+                        Reset to Defaults
+                    </button>
+                </div>
                 
                 <!-- Color Customization -->
                 <section class="config-section color-section">
@@ -57,18 +69,6 @@
                     <!-- Dynamic warnings inserted here -->
                 </section>
 
-                <!-- Download Button -->
-                <div class="download-section">
-                    <button class="btn-download" id="download-btn">
-                        Download Selected Parts
-                    </button>
-                    <button class="btn-copy-url" id="copy-url-btn">
-                        Copy Configuration URL
-                    </button>
-                    <button class="btn-reset" id="reset-btn">
-                        Reset to Defaults
-                    </button>
-                </div>
                 </div><!-- end config-panel-content -->
                 
                 <!-- Scroll indicator for mobile -->
@@ -104,11 +104,6 @@
                     <button class="viewer-btn" id="btn-zoom-reset" title="Reset Zoom">⟳<br>Reset</button>
                     <button class="viewer-btn" id="btn-zoom-in" title="Zoom In">+<br>Zoom</button>
 
-                    <div class="viewer-btn-separator"></div>
-
-                    <button class="viewer-btn" id="btn-wireframe" title="Wireframe">
-                        <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M12 2L2 7v10l10 5 10-5V7L12 2zm0 2.18l6.9 3.45L12 11.08 5.1 7.63 12 4.18zM4 8.82l7 3.5v7.86l-7-3.5V8.82zm9 11.36v-7.86l7-3.5v7.86l-7 3.5z"/></svg><br>Wire
-                    </button>
 
                     <div class="viewer-btn-separator"></div>
 

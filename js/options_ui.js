@@ -45,7 +45,10 @@ export function renderOptions(configOptions, container, onChange) {
             input.checked = Boolean(body.default);
             input.addEventListener('change', () => onChange(optId, input.checked));
             label.appendChild(input);
-            label.appendChild(document.createTextNode(` ${body.label || optId}`));
+            const span = document.createElement('span');
+            span.className = 'option-label';
+            span.textContent = body.label || optId;
+            label.appendChild(span);
             group.appendChild(label);
             section.appendChild(group);
             inputsByOption.set(optId, { kind: 'bool', body, input });
@@ -80,7 +83,10 @@ export function renderOptions(configOptions, container, onChange) {
                     if (input.checked) onChange(optId, choice.id);
                 });
                 label.appendChild(input);
-                label.appendChild(document.createTextNode(` ${choice.label || choice.id}`));
+                const span = document.createElement('span');
+                span.className = 'option-label';
+                span.textContent = choice.label || choice.id;
+                label.appendChild(span);
                 group.appendChild(label);
                 entries.push({ input, label });
             }

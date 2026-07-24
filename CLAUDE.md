@@ -29,9 +29,5 @@ Everything the configurator shows is generated from **one hand-authored spec**: 
 - **Colors**: the sidecar cascade — a node's own `nodes:` entry category wins, then its own autoAssign glob match, then the nearest ancestor's category (`categoryFor` in js/sidecar_colors.js). `Main` and `Accent` use the user-pickable colors; other categories use palette color/metalness/opacity. Categories without a color (e.g. `Hidden`) leave the GLB material untouched.
 - **Options UI** is rendered from `manifest.configOptions` by js/options_ui.js; there is no hardcoded option markup.
 - **Compatibility** warnings render from the manifest's uniform `compatibility: [{when, incompatible, message}]` list (currently empty in the spec).
-- **Sharing**: `getShareableState()` → base64-JSON → URL hash, falling back to `sessionStorage` (key: `a4t-config`). Valid config keys come from the manifest's option ids.
-- **Downloads** are disabled (button hidden in index.html) until the spec's per-part `stl:` fields are populated.
-
-## Naming caveat
-
-UI / branding say "Prusawire 2026.R1", but some identifiers (notably the sessionStorage key `a4t-config`) still say "A4T". Treat A4T-named code as the live system unless an explicit rename is in flight — don't reflexively rename it without scope agreement.
+- **Sharing**: `getShareableState()` → base64-JSON → URL hash, falling back to `sessionStorage` (key: `prusawire-config`). Valid config keys come from the manifest's option ids.
+- **Downloads**: `downloadFileList` (js/manifest_rules.js) resolves the manifest's `downloads` block (`always` files + option-gated `groups`) for the current config; files fetch from `downloads.base` (a `?stlBase=` query param overrides it for local testing) and zip with folder structure preserved.

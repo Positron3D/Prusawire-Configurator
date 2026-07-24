@@ -1,4 +1,4 @@
-/* A4T Configurator Styles */
+/* Prusawire Configurator Styles */
 
 :root {
     /* Backgrounds - from dwtas.net */
@@ -7,10 +7,10 @@
     --bg-panel: #1c2128;
     --bg-tertiary: #161b22;
     
-    /* Accent colors - blue tones */
-    --accent: #4a6fa5;
-    --accent-hover: #6989b9;
-    --accent-light: #7ea3cc;
+    /* Accent colors - Positron orange */
+    --accent: #DE9400;
+    --accent-hover: #F5A623;
+    --accent-light: #FFC15E;
     
     /* Text */
     --text-primary: #f0f3f6;
@@ -116,12 +116,24 @@ body {
     -webkit-overflow-scrolling: touch;
 }
 
-/* Option widgets flow in two columns inside the wider panel. */
+/* Option widgets flow in two columns inside the wider panel, divided by
+   a thin rule down the middle of the gap. */
 #option-sections {
     display: grid;
     grid-template-columns: 1fr 1fr;
     column-gap: 1.25rem;
     align-items: start;
+    position: relative;
+}
+
+#option-sections::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 50%;
+    width: 1px;
+    background: var(--border-color);
 }
 
 /* Custom scrollbar for webkit browsers (Chrome, Safari, Edge) */
@@ -188,6 +200,8 @@ body {
 }
 
 .config-section {
+    margin-left: 0.5rem;
+    margin-right: 0.5rem;
     margin-bottom: 1.25rem;
 }
 
@@ -409,12 +423,17 @@ body {
 
 /* Download Button */
 .download-section {
-    margin-top: 1rem;
-    padding-top: 1rem;
-    border-top: 1px solid var(--border-color);
+    margin: 0 0.5rem 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border-color);
     display: flex;
-    flex-direction: column;
+    flex-wrap: wrap;
     gap: 0.5rem;
+}
+
+.download-section button {
+    flex: 1 1 30%;
+    min-width: 150px;
 }
 
 .btn-download {
@@ -467,7 +486,7 @@ body {
 
 .btn-reset:hover {
     background: var(--bg-tertiary);
-    border-color: var(--border-color);
+    border-color: var(--accent);
 }
 
 /* 3D Viewer */
@@ -731,6 +750,10 @@ body {
 
     #option-sections {
         grid-template-columns: 1fr;
+    }
+
+    #option-sections::before {
+        display: none;
     }
     
     .scroll-indicator {
