@@ -16,7 +16,7 @@ STL downloads fetch from the Prusawire GitHub repo (`downloads.base` in the mani
 
 ## Authoring the model and options
 
-The configurator is entirely data-driven by three generated files in `models/` (gitignored — supplied by `sync-models.sh` or at deploy time):
+The configurator is entirely data-driven by three generated files in `models/` (committed as raw files so GitHub Pages can serve them — LFS pointers would break the viewer; refresh them with `sync-models.sh` and commit):
 
 - **`Prusawire_2026.R1.glb`** — one composite Draco GLB containing every build variant, produced by the [CADScope](https://github.com/erikbuild/CADScope) STEP→GLB pipeline.
 - **`Prusawire_2026.R1.manifest.json`** — options, choices, and per-part `visible: { when/unless }` rules.

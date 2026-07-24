@@ -14,7 +14,7 @@ Plain HTML / CSS / ES-module JS. No build step, no `package.json`. Unit tests ru
 - `tests/` — node:test suites for the pure modules (`node --test tests/manifest_rules.test.js tests/sidecar_colors.test.js`).
 - `css/style.css` — dark-theme styles, CSS variables in `:root`.
 - `assets/bg.hdr` — HDRI environment map (RGBELoader + PMREMGenerator).
-- `models/` — the three generated assets (composite GLB, `manifest.json`, `colors.json`). **Not committed** — populate with `./sync-models.sh` from a sibling CADScope checkout.
+- `models/` — the three generated assets (composite GLB, `manifest.json`, `colors.json`), committed as **raw files** (GitHub Pages serves this repo directly and will not serve LFS pointers). Refresh with `./sync-models.sh` from a sibling CADScope checkout, then commit.
 
 Three.js (GLTFLoader + DRACOLoader) is loaded via the `<script type="importmap">` block in `index.html`.
 

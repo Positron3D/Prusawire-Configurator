@@ -33,11 +33,6 @@ yarn.lock
 dist/
 build/
 
-# Source models — large binaries the configurator loads at runtime.
-# Tracked separately (or via LFS); not committed to this repo.
-models/*
-!models/.gitkeep
-
 # Temporary / scratch
 tmp/
 temp/
