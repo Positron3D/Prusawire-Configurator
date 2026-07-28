@@ -11,6 +11,7 @@ import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
 import { defaultConfig as buildDefaultConfig, matchesClause, evaluateVisible, validConfigKeys, downloadFileList, reconcileConfig } from './manifest_rules.js';
 import { buildSidecarLookups, extendPath, categoryFor } from './sidecar_colors.js';
 import { renderOptions } from './options_ui.js';
+import { initTheme } from './theme.js';
 
 const HDRI_PATH = 'assets/bg.hdr';
 const BASE_BRIGHTNESS = 1.0;
@@ -286,7 +287,7 @@ function initThreeJS() {
 
     // Scene
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x0a0c10);
+    applyViewportBackground();
 
     // Camera - set up for mm scale (parts are ~100mm)
     camera = new THREE.PerspectiveCamera(25, width / height, 1, 10000);
@@ -407,6 +408,20 @@ function requestRender() {
         if (stillAnimating) requestRender();
     });
 }
+
+// Canvas background follows the active UI theme; the scene exists only once
+// the 3D preview has been enabled.
+function applyViewportBackground() {
+    const bg = getComputedStyle(document.documentElement).getPropertyValue('--viewport-bg').trim();
+    scene.background = new THREE.Color(bg);
+}
+
+document.addEventListener('themechange', () => {
+    if (!scene) return;
+    applyViewportBackground();
+    requestRender();
+});
+initTheme();
 
 function animateCameraTo(target, duration = ANIM_DEFAULT) {
     cameraAnimation = {
