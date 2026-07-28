@@ -12,7 +12,7 @@ Plain HTML / CSS / ES-module JS. No build step, no `package.json`. Unit tests ru
 - `js/sidecar_colors.js` — pure sidecar lookups: palette, autoAssign glob rules, per-node entries, category cascade helpers.
 - `js/options_ui.js` — renders `configOptions` into widgets (`radio` default, `dropdown`, `bool`; unknown types fall back to radio with a console warning).
 - `tests/` — node:test suites for the pure modules (`node --test tests/manifest_rules.test.js tests/sidecar_colors.test.js`).
-- `css/style.css` — dark-theme styles, CSS variables in `:root`.
+- `css/style.css` — CSS variables in `:root` (dark, the default) with a `:root[data-theme="light"]` override block; `js/theme.js` drives the header switch and persists the choice (localStorage key: `prusawire-theme`).
 - `assets/bg.hdr` — HDRI environment map (RGBELoader + PMREMGenerator).
 - `models/` — the three generated assets (composite GLB, `manifest.json`, `colors.json`), committed as **raw files** (GitHub Pages serves this repo directly and will not serve LFS pointers). Refresh with `./sync-models.sh` from a sibling CADScope checkout, then commit.
 
