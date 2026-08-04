@@ -8,10 +8,12 @@
 option — bare-carriage 3D preview, sidebar warning notice, and correct STL
 swaps in the download ZIP.
 
-**Architecture:** Data-only change. All edits land in
-`CADScope/models/Prusawire_2026.R1.spec.yaml`; `build_configurator.py`
-compiles it to the manifest, `./sync-models.sh` copies it here. No configurator
-JS changes — the rules engine already supports everything used.
+**Architecture:** Data change plus one line of app wiring. The spec edits land
+in `CADScope/models/Prusawire_2026.R1.spec.yaml`; `build_configurator.py`
+compiles it to the manifest, `./sync-models.sh` copies it here. The rules
+engine already supports everything used; `js/app.js` init additionally calls
+`updateConfiguration()` after restoring state so warnings evaluate on a fresh
+page load.
 
 **Tech Stack:** YAML spec + Python compiler (CADScope), Node's built-in test
 runner, plain static site.

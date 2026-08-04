@@ -4,11 +4,15 @@
 Toolhead option. Selecting one hides the toolhead in the 3D preview, shows an
 informational warning, and swaps the correct STLs into the download ZIP.
 
-This is a data-only change: everything lands in
+Nearly all of the change lands in
 `CADScope/models/Prusawire_2026.R1.spec.yaml` and flows through
-`build_configurator.py` → `./sync-models.sh`. No configurator JS changes — the
-rules engine already handles array-valued `when` clauses, option-gated download
-groups, and `compatibility` warning messages.
+`build_configurator.py` → `./sync-models.sh` — the rules engine already
+handles array-valued `when` clauses, option-gated download groups, and
+`compatibility` warning messages. One line of `js/app.js` rides along: init
+calls `updateConfiguration()` after restoring state so warnings evaluate on a
+fresh page load. (Previously only the interaction paths evaluated them —
+invisible while `compatibility` was empty, surfaced by the share-URL
+acceptance test.)
 
 ## Decisions (Erik, 2026-08-03)
 
