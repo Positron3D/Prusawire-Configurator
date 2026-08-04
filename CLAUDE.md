@@ -28,6 +28,6 @@ Everything the configurator shows is generated from **one hand-authored spec**: 
 - **Node paths** are slash-joined cleaned names from the visual root, identical to CADScope's scaffold paths; `indexPartNodes` stamps each scene node's path into `userData.scaffoldPath` at load.
 - **Colors**: the sidecar cascade — a node's own `nodes:` entry category wins, then its own autoAssign glob match, then the nearest ancestor's category (`categoryFor` in js/sidecar_colors.js). `Main` and `Accent` use the user-pickable colors; other categories use palette color/metalness/opacity. Categories without a color (e.g. `Hidden`) leave the GLB material untouched.
 - **Options UI** is rendered from `manifest.configOptions` by js/options_ui.js; there is no hardcoded option markup.
-- **Compatibility** warnings render from the manifest's uniform `compatibility: [{when, incompatible, message}]` list (currently empty in the spec).
+- **Compatibility** warnings render from the manifest's uniform `compatibility: [{when, incompatible, message}]` list.
 - **Sharing**: `getShareableState()` → base64-JSON → URL hash, falling back to `sessionStorage` (key: `prusawire-config`). Valid config keys come from the manifest's option ids.
 - **Downloads**: `downloadFileList` (js/manifest_rules.js) resolves the manifest's `downloads` block (`always` files + option-gated `groups`) for the current config; files fetch from `downloads.base` (a `?stlBase=` query param overrides it for local testing) and zip with folder structure preserved.
