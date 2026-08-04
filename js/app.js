@@ -1024,6 +1024,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     setupEventListeners();
     syncUIToState();
+    updateConfiguration();
 
     const previewToggle = document.getElementById('preview-toggle');
     previewToggle.addEventListener('change', () => setPreview(previewToggle.checked));
