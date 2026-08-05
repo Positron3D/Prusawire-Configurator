@@ -1,6 +1,6 @@
 #!/bin/sh
 # ABOUTME: Copies the generated Prusawire model assets from the sibling
-# ABOUTME: CADScope checkout into the gitignored models/ directory.
+# ABOUTME: CADScope checkout into the committed models/ directory.
 set -eu
 
 SRC="${1:-../CADScope/models}"
