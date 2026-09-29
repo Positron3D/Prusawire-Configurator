@@ -37,7 +37,8 @@
     --overlay-bg-strong: rgba(26, 26, 46, 0.95);
     --badge-bg: rgba(10, 12, 16, 0.8);
     --warning-bg: rgba(251, 191, 36, 0.1);
-    --on-accent: #ffffff;
+    --on-accent: #1a1205; /* near-black on amber (7.4:1); white on #DE9400 is only 2.5:1 */
+    --on-accent-hover: #1a1205;
 }
 
 :root[data-theme="light"] {
@@ -49,6 +50,8 @@
 
     /* Accent colors - Positron orange, darkened for contrast on light surfaces */
     --accent: #9a6700;
+    --on-accent: #ffffff; /* white on #9a6700 is 4.9:1 */
+    --on-accent-hover: #1a1205; /* white on the lighter #bf7d00 hover is only 3.4:1 */
     --accent-hover: #bf7d00;
     --accent-light: #de9400;
 
@@ -509,6 +512,7 @@ body {
 
 .btn-download:hover {
     background: var(--accent-hover);
+    color: var(--on-accent-hover);
 }
 
 .btn-copy-url {
